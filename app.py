@@ -7,12 +7,14 @@ app = Flask(__name__, static_folder="static", static_url_path="/static")
 app.secret_key = "supersecretkey"
 
 # --- SQLite setup ---
-DB_FILE = "volunteers.db"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DB_FILE = os.path.join(BASE_DIR, "volunteers.db")
 
 def get_db_connection():
     conn = sqlite3.connect(DB_FILE)
     conn.row_factory = sqlite3.Row
     return conn
+
 
 # --- File uploads ---
 STATIC_FOLDER = "static"
