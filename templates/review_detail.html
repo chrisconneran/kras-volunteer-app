@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Volunteer Review & Assignment</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <style>
+      body {
+        background-color: #f8f9fc;
+        font-family: 'Segoe UI', Tahoma, Verdana, sans-serif;
+      }
+
+      .wrap {
+        max-width: 900px;
+        margin: 0 auto;
+      }
+
+      /* Consistent blue header with logo */
+      .header-bar {
+        background-color: #e8f0ff;
+        border-radius: 10px;
+        padding: 15px 20px;
+        margin-bottom: 15px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 10px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+      }
+
+      .header-left {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .logo {
+        height: 55px;
+        width: auto;
+      }
+
+      .header-text h2 {
+        font-weight: 700;
+        font-size: 1.5rem;
+        color: #1d4ed8;
+        margin-bottom: 0;
+      }
+
+      .header-text p {
+        margin-bottom: 0;
+        font-size: 0.95rem;
+        color: #555;
+      }
+
+      .section {
+        background: white;
+        border: 2px solid #2563eb;
+        border-radius: 8px;
+        padding: 12px;
+        margin-bottom: 12px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+      }
+
+      .small-text {
+        font-size: 0.88rem;
+        color: #444;
+        margin-bottom: 4px;
+      }
+
+      .btn-sm {
+        font-size: 0.8rem;
+        padding: 3px 7px;
+      }
+    </style>
+  </head>
+
+  <body class="p-2">
+    <div class="wrap">
+
+      <!-- Updated consistent header -->
+      <div class="header-bar shadow-sm">
+        <div class="header-left">
+          <img src="{{ url_for('static', filename='kras_logo.png') }}" alt="KRAS Kickers Logo" class="logo">
+          <div class="header-text">
+            <h2>Volunteer Review & Assignment</h2>
+            <p>View details, add notes, update status, and review history.</p>
+          </div>
+        </div>
+        <a href="/volunteers" class="btn btn-outline-primary btn-sm">Back to list</a>
+      </div>
+
+      <div class="section">
+        <div class="small-text"><b>Name:</b> {{ app.first_name or app.name }} {{ app.last_name or "" }}</div>
+        <div class="small-text"><b>Email:</b> {{ app.email }}</div>
+        <div class="small-text"><b>Preferred Contact:</b> {{ app.contact or app.contact_pref }}</div>
+        <div class="small-text"><b>Opportunity:</b> {{ app.title }}</div>
+        <div class="small-text"><b>Time:</b> {{ app.time }}</div>
+        <div class="small-text"><b>Duration:</b> {{ app.duration }}</div>
+        <div class="small-text"><b>Location:</b> {{ app.location }}</div>
+        {% if app.availability %}
+        <div class="small-text"><b>Availability:</b> {{ app.availability }}</div>
+        {% endif %}
+        {% if app.skills %}
+        <div class="small-text"><b>Skills:</b> {{ app.skills }}</div>
+        {% endif %}
+        {% if app.comments %}
+        <div class="small-text"><b>Comments:</b> {{ app.comments }}</div>
+        {% endif %}
+      </div>
+
+      <div class="section d-flex align-items-center gap-2">
+        <div class="small-text mb-0"><b>Status:</b></div>
+        <select id="statusSelect" class="form-select form-select-sm w-auto">
+          <option value="Pending" {{ "selected" if app.status == "Pending" }}>Pending</option>
+          <option value="Assigned" {{ "selected" if app.status == "Assigned" }}>Assigned</option>
+          <option value="Completed" {{ "selected" if app.status == "Completed" }}>Completed</option>
+        </select>
+        <a href="mailto:{{ app.email }}" class="btn btn-outline-primary btn-sm ms-auto">Email</a>
+      </div>
+
+      <div class="section">
+        <h6 class="mb-2">Notes</h6>
+        <ul class="small">
+          {% for note in app.notes or [] %}
+          <li><b>{{ note.timestamp }}</b> — {{ note.note }}</li>
+          {% else %}
+          <li class="text-muted">No notes yet.</li>
+          {% endfor %}
+        </ul>
+        <form id="noteForm" class="mt-2">
+          <div class="input-group input-group-sm">
+            <input type="text" name="note" class="form-control" placeholder="Add a note...">
+            <button class="btn btn-primary btn-sm">Add</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="section">
+        <h6 class="mb-2">History</h6>
+        <ul class="small">
+          {% for h in app.history or [] %}
+          <li><b>{{ h.timestamp }}</b> — {{ h.event }}</li>
+          {% else %}
+          <li class="text-muted">No history yet.</li>
+          {% endfor %}
+        </ul>
+      </div>
+
+    </div>
+
+    <script>
+      // Status update
+      $("#statusSelect").on("change", function() {
+        const status = $(this).val();
+        $.post(`/update_status/{{ app.id }}`, { status: status }, function(resp) {
+          alert(resp.message);
+          location.reload();
+        });
+      });
+
+      // Notes
+      $("#noteForm").on("submit", function(e) {
+        e.preventDefault();
+        const note = $(this).find("input[name='note']").val();
+        if (!note) return;
+        $.post(`/add_note/{{ app.id }}`, { note: note }, function(resp) {
+          alert(resp.message);
+          location.reload();
+        });
+      });
+    </script>
+  </body>
+</html>

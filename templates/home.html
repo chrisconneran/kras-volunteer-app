@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row justify-content-center mt-5">
+  <div class="col-md-8">
+    <div class="card text-center p-5 shadow-sm" style="background-color:#e9f2ff;">
+      <img src="{{ url_for('static', filename='kras_logo.png') }}" alt="KRAS Kickers Logo" class="mx-auto mb-3" style="height:60px;">
+      <h1 class="fw-bold mb-3">KRAS Kickers <span class="text-primary">VOLUNTEER</span></h1>
+      <p class="lead mb-4">Make a difference at KRAS Kickers. Volunteer with us to support our mission.</p>
+      <a href="{{ url_for('opportunities') }}" class="btn btn-primary btn-lg">View Opportunities</a>
+    </div>
+  </div>
+</div>
+{% endblock %}

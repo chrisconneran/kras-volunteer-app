@@ -1,0 +1,136 @@
+[
+  {
+    "id": 1,
+    "title": "Greater - San Francisco Event",
+    "time": "6 hours - Thursday - Friday",
+    "duration": "2 Days - February 10 -11, 2026",
+    "location": "San Francisco - UCSF - Labs - Kickers Annual Event",
+    "requirements": "Warm and Friendly attitude",
+    "image": "ucsf_event.png",
+    "mode": "In Person - 1 time event",
+    "desc": "very fun time too",
+    "tags": [
+      {
+        "color": "#16a34a",
+        "name": "on-site"
+      },
+      {
+        "color": "#9333ea",
+        "name": "Travel Required"
+      }
+    ]
+  },
+  {
+    "id": 2,
+    "title": "Editor - Monthly News Letter",
+    "time": "4 hours / month",
+    "duration": "Monthly",
+    "location": "Remote via Zoom",
+    "requirements": "Ability to pull together in written form an electronic newsletter",
+    "image": "newsletter_image.png",
+    "mode": "Remote",
+    "desc": "",
+    "tags": [
+      {
+        "name": "Remote",
+        "color": "#6b7280"
+      }
+    ]
+  },
+  {
+    "id": 3,
+    "title": "Booth/Table Volunteer at Conferences",
+    "time": "2 - 4 hours",
+    "duration": "1 - 2 days depending on conference location",
+    "location": "Depends on conference location - may require travel",
+    "requirements": "Warm and Friendly attitude",
+    "image": "events_asco.jpeg",
+    "mode": "In-person at events",
+    "desc": "",
+    "tags": [
+      {
+        "color": "#16a34a",
+        "name": "on-site"
+      },
+      {
+        "name": "Travel Required",
+        "color": "#9333ea"
+      }
+    ]
+  },
+  {
+    "id": 4,
+    "title": "Patient Peer Mentor",
+    "time": "2 hours per week",
+    "duration": "6 months",
+    "location": "Remote phone or text",
+    "requirements": "Experience as a patient or caregiver",
+    "image": "patient_empowerment.jpeg",
+    "mode": "Remote",
+    "desc": ""
+  },
+  {
+    "id": 5,
+    "title": "KRAS Cancer Connect 2026 - Registration Table",
+    "time": "2 - 4 hours ",
+    "duration": "1 -2 days depending on conference location",
+    "mode": "In Person - 1 time event",
+    "desc": "Support Registration table activities at the event",
+    "requirements": "Warm and Friendly attitude - organized",
+    "location": "San Francisco - LUMA Hotel, San Francisco",
+    "image": "community_outreach.jpeg"
+  },
+  {
+    "id": 6,
+    "title": "test",
+    "time": "6 hours - Thursday - Friday",
+    "duration": "Monthly",
+    "mode": "1-time",
+    "desc": "",
+    "requirements": "",
+    "location": "",
+    "image": "default.png",
+    "tags": [],
+    "closed": true,
+    "closed_date": "2025-11-06 16:25",
+    "volunteers": []
+  },
+  {
+    "id": 7,
+    "title": "test 2",
+    "time": "",
+    "duration": "",
+    "mode": "",
+    "desc": "",
+    "requirements": "",
+    "location": "",
+    "image": "default.png",
+    "tags": [
+      {
+        "name": "fff",
+        "color": "#2563eb"
+      }
+    ],
+    "closed": true,
+    "closed_date": "2025-11-06 16:45",
+    "volunteers": []
+  },
+  {
+    "id": 8,
+    "title": "Phone Buddy",
+    "time": "2 - 4 hours ",
+    "duration": "3 months",
+    "mode": "Remote",
+    "desc": "",
+    "requirements": "",
+    "location": "",
+    "image": "default.png",
+    "tags": [
+      {
+        "name": "remote",
+        "color": "#2563eb"
+      }
+    ],
+    "closed": false
+  }
+]

@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Volunteer Applications</h2>
+{% if applications %}
+  <table class="table table-striped mt-3">
+    <thead>
+      <tr>
+        <th>Name</th><th>Email</th><th>Phone</th><th>Role</th><th>Submitted</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for app in applications %}
+      <tr>
+        <td>{{ app.name }}</td>
+        <td>{{ app.email }}</td>
+        <td>{{ app.phone }}</td>
+        <td>{{ app.opportunity }}</td>
+        <td>{{ app.timestamp.strftime('%Y-%m-%d %H:%M') }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% else %}
+  <p>No applications submitted yet.</p>
+{% endif %}
+{% endblock %}
