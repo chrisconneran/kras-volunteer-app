@@ -7,7 +7,7 @@ venv/
 .venv/
 
 # SQLite databases
-*.db
+# *.db
 
 # OS files
 .DS_Store
