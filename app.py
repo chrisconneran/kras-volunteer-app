@@ -1,14 +1,16 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, redirect, url_for
 from datetime import datetime
-import json, os, sqlite3
+import os
+import json
+import sqlite3
 from werkzeug.utils import secure_filename
 
 app = Flask(__name__, static_folder="static", static_url_path="/static")
 app.secret_key = "supersecretkey"
 
 # --- SQLite setup ---
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_FILE = os.path.join(BASE_DIR, "volunteers.db")
+DB_FILE = "volunteers.db"
+
 
 def get_db_connection():
     conn = sqlite3.connect(DB_FILE)
@@ -22,7 +24,8 @@ os.makedirs(STATIC_FOLDER, exist_ok=True)
 app.config["UPLOAD_FOLDER"] = STATIC_FOLDER
 ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "gif"}
 
-def allowed_file(filename):
+
+def allowed_file(filename: str) -> bool:
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
@@ -30,92 +33,109 @@ def dictify_rows(rows):
     return [dict(row) for row in rows]
 
 
-# --- Shared POST handler for volunteer applications ---
+# --- Shared POST handler for volunteer application submissions ---
 def _handle_application_post():
     form_data = request.form.to_dict()
-    form_data["timestamp"] = datetime.now().strftime("%Y-%m-%d %H:%M")
-    form_data["status"] = "Pending"
-    form_data["history"] = json.dumps([{
-        "event": "Application submitted",
-        "timestamp": form_data["timestamp"]
-    }])
-    form_data["notes"] = json.dumps([])
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
+
+    status = "Pending"
+    history_list = [
+        {
+            "event": "Application submitted",
+            "timestamp": timestamp,
+        }
+    ]
+    notes_list = []
 
     conn = get_db_connection()
     cur = conn.cursor()
-    cur.execute("""
-        INSERT INTO applications 
+    cur.execute(
+        """
+        INSERT INTO applications
         (first_name, last_name, email, phone, contact, title, time, duration, location, comments, status, timestamp, history, notes)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """, (
-        form_data.get("first_name"),
-        form_data.get("last_name"),
-        form_data.get("email"),
-        form_data.get("phone"),
-        form_data.get("contact"),
-        form_data.get("title"),
-        form_data.get("time"),
-        form_data.get("duration"),
-        form_data.get("location"),
-        form_data.get("comments"),
-        form_data["status"],
-        form_data["timestamp"],
-        form_data["history"],
-        form_data["notes"]
-    ))
+        """,
+        (
+            form_data.get("first_name"),
+            form_data.get("last_name"),
+            form_data.get("email"),
+            form_data.get("phone"),
+            form_data.get("contact"),
+            form_data.get("title"),
+            form_data.get("time"),
+            form_data.get("duration"),
+            form_data.get("location"),
+            form_data.get("comments"),
+            status,
+            timestamp,
+            json.dumps(history_list),
+            json.dumps(notes_list),
+        ),
+    )
     conn.commit()
     conn.close()
 
-    return jsonify({
-        "message": "Application submitted successfully!",
-        "title": form_data.get("title", "Volunteer Opportunity")
-    })
+    return jsonify(
+        {
+            "message": "Application submitted successfully!",
+            "title": form_data.get("title", "Volunteer Opportunity"),
+        }
+    )
 
 
-# --- Homepage (Volunteer Opportunities + Application Form) ---
+# --- HOME PAGE (Volunteer Opportunities + Application Form) ---
 @app.route("/", methods=["GET", "POST"])
 def index():
-    import json
-
     if request.method == "POST":
         return _handle_application_post()
 
     conn = get_db_connection()
-    rows = conn.execute("SELECT * FROM opportunities WHERE closed = 0").fetchall()
+    rows = conn.execute(
+        "SELECT * FROM opportunities WHERE closed = 0 OR closed IS NULL"
+    ).fetchall()
     conn.close()
-
     opportunities = dictify_rows(rows)
 
-    # Decode tags JSON for each opportunity
+    # Convert tags JSON string into Python objects for the template
+    # and expose "frequency" as an alias for the DB column "mode"
     for opp in opportunities:
-        try:
-            if isinstance(opp.get("tags"), str):
-                opp["tags"] = json.loads(opp["tags"])
-        except Exception:
+        tags_raw = opp.get("tags")
+        if isinstance(tags_raw, str) and tags_raw.strip():
+            try:
+                opp["tags"] = json.loads(tags_raw)
+            except json.JSONDecodeError:
+                opp["tags"] = []
+        elif tags_raw is None:
             opp["tags"] = []
+        # alias for templates – index.html expects opp.frequency
+        opp["frequency"] = opp.get("mode", "")
 
     return render_template("index.html", opportunities=opportunities)
 
 
-
-
-# --- Manage (Active Opportunities) ---
-@app.route("/manage")
+# --- Manage Active Opportunities ---
+@app.route("/manage", methods=["GET"])
 def manage():
     conn = get_db_connection()
-    rows = conn.execute("SELECT * FROM opportunities WHERE closed IS NULL OR closed = 0").fetchall()
+    rows = conn.execute(
+        "SELECT * FROM opportunities WHERE closed = 0 OR closed IS NULL"
+    ).fetchall()
     conn.close()
     opportunities = dictify_rows(rows)
 
-    # Fix tags so they show as list, not JSON text
-    for o in opportunities:
-        try:
-            o["tags"] = json.loads(o.get("tags", "[]"))
-        except Exception:
-            o["tags"] = []
+    for opp in opportunities:
+        tags_raw = opp.get("tags")
+        if isinstance(tags_raw, str) and tags_raw.strip():
+            try:
+                opp["tags"] = json.loads(tags_raw)
+            except json.JSONDecodeError:
+                opp["tags"] = []
+        elif tags_raw is None:
+            opp["tags"] = []
+        # alias to match any template that uses opp.frequency
+        opp["frequency"] = opp.get("mode", "")
 
     return render_template("manage.html", opportunities=opportunities)
-
 
 
 # --- Add Opportunity ---
@@ -130,27 +150,34 @@ def add_opportunity():
             image_path = filename
 
     tags_json = request.form.get("tags_json") or request.form.get("tags") or "[]"
+    try:
+        tags = json.loads(tags_json)
+    except Exception:
+        tags = []
+    tags_json = json.dumps(tags)
 
     conn = get_db_connection()
     cur = conn.cursor()
-    cur.execute("""
-        INSERT INTO opportunities 
+    cur.execute(
+        """
+        INSERT INTO opportunities
         (title, time, duration, mode, desc, requirements, location, image, tags, closed)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
-    """, (
-        request.form["title"],
-        request.form.get("time", ""),
-        request.form.get("duration", ""),
-        request.form.get("mode", ""),
-        request.form.get("desc", ""),
-        request.form.get("requirements", ""),
-        request.form.get("location", ""),
-        image_path if image_path else "default.png",
-        tags_json
-    ))
+        """,
+        (
+            request.form.get("title"),
+            request.form.get("time", ""),
+            request.form.get("duration", ""),
+            request.form.get("mode", ""),
+            request.form.get("desc", ""),
+            request.form.get("requirements", ""),
+            request.form.get("location", ""),
+            image_path if image_path else "default.png",
+            tags_json,
+        ),
+    )
     conn.commit()
     conn.close()
-
     return jsonify({"message": "Opportunity added!"})
 
 
@@ -160,16 +187,15 @@ def update_opportunity(opp_id):
     conn = get_db_connection()
     cur = conn.cursor()
 
-    # Safely parse and re-encode tags
-    tags_raw = request.form.get("tags_json") or request.form.get("tags") or "[]"
+    tags_json = request.form.get("tags_json") or request.form.get("tags") or "[]"
     try:
-        tags = json.loads(tags_raw)
+        tags = json.loads(tags_json)
     except Exception:
         tags = []
     tags_json = json.dumps(tags)
 
     update_fields = (
-        request.form["title"],
+        request.form.get("title"),
         request.form.get("time", ""),
         request.form.get("duration", ""),
         request.form.get("mode", ""),
@@ -177,34 +203,39 @@ def update_opportunity(opp_id):
         request.form.get("requirements", ""),
         request.form.get("location", ""),
         tags_json,
-        opp_id
+        opp_id,
     )
 
-    cur.execute("""
-        UPDATE opportunities 
-        SET title=?, time=?, duration=?, mode=?, desc=?, requirements=?, location=?, tags=? 
-        WHERE id=?
-    """, update_fields)
+    cur.execute(
+        """
+        UPDATE opportunities
+        SET title = ?, time = ?, duration = ?, mode = ?, desc = ?, requirements = ?, location = ?, tags = ?
+        WHERE id = ?
+        """,
+        update_fields,
+    )
 
-    # Optional image upload
     if "image" in request.files:
         file = request.files["image"]
         if file and allowed_file(file.filename):
             filename = secure_filename(file.filename).replace(" ", "_").lower()
             file.save(os.path.join(app.config["UPLOAD_FOLDER"], filename))
-            cur.execute("UPDATE opportunities SET image=? WHERE id=?", (filename, opp_id))
+            cur.execute(
+                "UPDATE opportunities SET image = ? WHERE id = ?",
+                (filename, opp_id),
+            )
 
     conn.commit()
     conn.close()
     return jsonify({"message": "Opportunity updated!"})
 
 
-
 # --- Delete Opportunity ---
 @app.route("/delete/<int:opp_id>", methods=["POST"])
 def delete_opportunity(opp_id):
     conn = get_db_connection()
-    conn.execute("DELETE FROM opportunities WHERE id=?", (opp_id,))
+    cur = conn.cursor()
+    cur.execute("DELETE FROM opportunities WHERE id = ?", (opp_id,))
     conn.commit()
     conn.close()
     return jsonify({"message": "Opportunity deleted"})
@@ -220,142 +251,408 @@ def menu():
 @app.route("/close_opportunity/<int:opp_id>", methods=["POST"])
 def close_opportunity(opp_id):
     conn = get_db_connection()
-    conn.execute("UPDATE opportunities SET closed=1, closed_date=? WHERE id=?", 
-                 (datetime.now().strftime("%Y-%m-%d %H:%M"), opp_id))
+    cur = conn.cursor()
+    closed_date = datetime.now().strftime("%Y-%m-%d %H:%M")
+    cur.execute(
+        "UPDATE opportunities SET closed = 1, closed_date = ? WHERE id = ?",
+        (closed_date, opp_id),
+    )
     conn.commit()
     conn.close()
-    return jsonify({"message": "Opportunity closed"})
+    return jsonify({"message": "Opportunity marked as closed."})
 
 
 @app.route("/reopen_opportunity/<int:opp_id>", methods=["POST"])
 def reopen_opportunity(opp_id):
     conn = get_db_connection()
-    conn.execute("UPDATE opportunities SET closed=0, closed_date=NULL WHERE id=?", (opp_id,))
+    cur = conn.cursor()
+    cur.execute(
+        "UPDATE opportunities SET closed = 0, closed_date = NULL WHERE id = ?",
+        (opp_id,),
+    )
     conn.commit()
     conn.close()
-    return jsonify({"message": "Opportunity reopened"})
+    return jsonify({"message": "Opportunity reopened successfully."})
 
 
 # --- Closed Opportunities ---
 @app.route("/closed")
 def closed_opportunities():
     conn = get_db_connection()
-    rows = conn.execute("SELECT * FROM opportunities WHERE closed = 1").fetchall()
+    opp_rows = conn.execute("SELECT * FROM opportunities WHERE closed = 1").fetchall()
+    apps_rows = conn.execute("SELECT * FROM applications").fetchall()
     conn.close()
-    opportunities = dictify_rows(rows)
+
+    opportunities = dictify_rows(opp_rows)
+    applications = dictify_rows(apps_rows)
+
+    for opp in opportunities:
+        tags_raw = opp.get("tags")
+        if isinstance(tags_raw, str) and tags_raw.strip():
+            try:
+                opp["tags"] = json.loads(tags_raw)
+            except json.JSONDecodeError:
+                opp["tags"] = []
+        elif tags_raw is None:
+            opp["tags"] = []
+        # expose frequency alias here too
+        opp["frequency"] = opp.get("mode", "")
+
+        opp["volunteers"] = [
+            a for a in applications if a.get("title") == opp.get("title")
+        ]
+
     return render_template("closed.html", opportunities=opportunities)
 
 
-
-# --- View Applicants for Specific Opportunity ---
+# --- View Applicants for a Specific Opportunity ---
 @app.route("/applicants/<int:opp_id>")
 def view_applicants(opp_id):
-    import json
     conn = get_db_connection()
-    opp = conn.execute("SELECT * FROM opportunities WHERE id=?", (opp_id,)).fetchone()
-    conn.close()
-
-    if not opp:
+    opp_row = conn.execute(
+        "SELECT * FROM opportunities WHERE id = ?", (opp_id,)
+    ).fetchone()
+    if opp_row is None:
+        conn.close()
         return "Opportunity not found", 404
 
-    # Convert to dictionary and parse tags JSON if present
-    opp_dict = dict(opp)
-    try:
-        opp_dict["tags"] = json.loads(opp_dict.get("tags", "[]"))
-    except Exception:
-        opp_dict["tags"] = []
-
-    conn = get_db_connection()
-    applicants = conn.execute("SELECT * FROM applications WHERE title=?", (opp_dict["title"],)).fetchall()
+    applicants_rows = conn.execute(
+        "SELECT * FROM applications WHERE title = ? ORDER BY timestamp DESC",
+        (opp_row["title"],),
+    ).fetchall()
     conn.close()
 
-    return render_template("applicants.html", opportunity=opp_dict, applicants=applicants)
+    opportunity = dict(opp_row)
+    tags_raw = opportunity.get("tags")
+    if isinstance(tags_raw, str) and tags_raw.strip():
+        try:
+            opportunity["tags"] = json.loads(tags_raw)
+        except json.JSONDecodeError:
+            opportunity["tags"] = []
+    elif tags_raw is None:
+        opportunity["tags"] = []
+    # alias for applicants.html if it wants opportunity.frequency
+    opportunity["frequency"] = opportunity.get("mode", "")
+
+    applicants = dictify_rows(applicants_rows)
+
+    return render_template(
+        "applicants.html", opportunity=opportunity, applicants=applicants
+    )
 
 
-
-# --- Volunteer Check-In ---
-@app.route("/check", methods=["GET"])
+# --- Volunteer Check-In (used by index page) ---
+@app.route("/check")
 def check_volunteer():
+    """
+    Check whether a volunteer already exists (by email) and,
+    if so, return their latest info plus any current ASSIGNED
+    opportunities as "assignments".
+    """
+
     email = request.args.get("email", "").strip().lower()
-    conn = get_db_connection()
-    app_entry = conn.execute("SELECT * FROM applications WHERE LOWER(email)=?", (email,)).fetchone()
-    conn.close()
-    if app_entry:
-        return jsonify({
+    if not email:
+        return jsonify({"exists": False}), 200
+
+    conn = sqlite3.connect("volunteers.db")
+    conn.row_factory = sqlite3.Row
+
+    try:
+        # 1) Look up the most recent application for this email
+        person_row = conn.execute(
+            """
+            SELECT
+                first_name,
+                last_name,
+                email,
+                phone
+            FROM applications
+            WHERE LOWER(email) = ?
+            ORDER BY timestamp DESC
+            LIMIT 1
+            """,
+            (email,),
+        ).fetchone()
+
+        if not person_row:
+            # New volunteer
+            return jsonify({"exists": False}), 200
+
+        # 2) Get current ASSIGNED opportunities for this volunteer,
+        #    joining to opportunities to get time/duration/frequency/location
+        assignment_rows = conn.execute(
+            """
+            SELECT
+                a.timestamp AS submitted_at,
+                a.title,
+                o.time        AS time_commitment,
+                o.duration    AS duration,
+                o.mode        AS frequency,
+                o.location    AS location
+            FROM applications a
+            LEFT JOIN opportunities o
+                ON a.title = o.title
+            WHERE
+                LOWER(a.email) = ?
+                AND a.status = 'Assigned'
+            ORDER BY a.timestamp DESC
+            """,
+            (email,),
+        ).fetchall()
+
+        assignments = [
+            {
+                "submitted_at": row["submitted_at"],
+                "title": row["title"],
+                "time_commitment": row["time_commitment"],
+                "duration": row["duration"],
+                "frequency": row["frequency"],
+                "location": row["location"],
+            }
+            for row in assignment_rows
+        ]
+
+        resp = {
             "exists": True,
-            "first_name": app_entry["first_name"],
-            "last_name": app_entry["last_name"],
-            "email": app_entry["email"]
-        })
-    return jsonify({"exists": False})
+            "first_name": person_row["first_name"],
+            "last_name": person_row["last_name"],
+            "email": person_row["email"],
+            "phone": person_row["phone"],
+            "assignments": assignments,
+        }
+        return jsonify(resp), 200
+
+    finally:
+        conn.close()
 
 
-# --- Review Applications ---
+# --- Review and Assignments ---
 @app.route("/review")
 def review():
     conn = get_db_connection()
-    rows = conn.execute("SELECT * FROM applications ORDER BY timestamp DESC").fetchall()
+    rows = conn.execute(
+        "SELECT * FROM applications ORDER BY timestamp DESC"
+    ).fetchall()
     conn.close()
-    apps = dictify_rows(rows)
-    return render_template("review.html", applications=apps)
+    applications = dictify_rows(rows)
 
+    for app_entry in applications:
+        history_raw = app_entry.get("history")
+        if isinstance(history_raw, str) and history_raw.strip():
+            try:
+                app_entry["history"] = json.loads(history_raw)
+            except json.JSONDecodeError:
+                app_entry["history"] = []
+        else:
+            app_entry["history"] = []
+
+        notes_raw = app_entry.get("notes")
+        if isinstance(notes_raw, str) and notes_raw.strip():
+            try:
+                app_entry["notes"] = json.loads(notes_raw)
+            except json.JSONDecodeError:
+                app_entry["notes"] = []
+        else:
+            app_entry["notes"] = []
+
+    return render_template("review.html", applications=applications)
 
 
 @app.route("/update_status/<int:app_id>", methods=["POST"])
 def update_status(app_id):
     new_status = request.form.get("status", "Pending")
     ts = datetime.now().strftime("%Y-%m-%d %H:%M")
+
     conn = get_db_connection()
-    app = conn.execute("SELECT * FROM applications WHERE id=?", (app_id,)).fetchone()
-    if app:
-        history = json.loads(app["history"])
-        history.append({"event": f"Status updated to {new_status}", "timestamp": ts})
-        conn.execute("UPDATE applications SET status=?, history=? WHERE id=?",
-                     (new_status, json.dumps(history), app_id))
-        conn.commit()
+    cur = conn.cursor()
+
+    row = cur.execute(
+        "SELECT history FROM applications WHERE id = ?", (app_id,)
+    ).fetchone()
+    if not row:
+        conn.close()
+        return jsonify({"error": "Application not found"}), 404
+
+    history_raw = row["history"] or "[]"
+    try:
+        history_list = json.loads(history_raw)
+    except json.JSONDecodeError:
+        history_list = []
+
+    history_list.append(
+        {
+            "event": f"Status updated to {new_status}",
+            "timestamp": ts,
+        }
+    )
+
+    cur.execute(
+        """
+        UPDATE applications
+        SET status = ?, history = ?
+        WHERE id = ?
+        """,
+        (new_status, json.dumps(history_list), app_id),
+    )
+    conn.commit()
     conn.close()
+
     return jsonify({"message": "Status updated successfully"})
+
+
+@app.route("/delete_application/<int:app_id>", methods=["POST"])
+def delete_application(app_id):
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute("DELETE FROM applications WHERE id = ?", (app_id,))
+    conn.commit()
+    conn.close()
+    return jsonify({"message": "Application deleted successfully."})
+
+
 
 
 # --- Volunteers Overview ---
 @app.route("/volunteers")
 def volunteers():
     conn = get_db_connection()
-    apps = conn.execute("SELECT * FROM applications ORDER BY timestamp DESC").fetchall()
+    rows = conn.execute(
+        "SELECT * FROM applications ORDER BY timestamp DESC"
+    ).fetchall()
     conn.close()
-    return render_template("volunteers.html", applications=apps)
+    applications = dictify_rows(rows)
+
+    for app_entry in applications:
+        history_raw = app_entry.get("history")
+        if isinstance(history_raw, str) and history_raw.strip():
+            try:
+                app_entry["history"] = json.loads(history_raw)
+            except json.JSONDecodeError:
+                app_entry["history"] = []
+        else:
+            app_entry["history"] = []
+
+        notes_raw = app_entry.get("notes")
+        if isinstance(notes_raw, str) and notes_raw.strip():
+            try:
+                app_entry["notes"] = json.loads(notes_raw)
+            except json.JSONDecodeError:
+                app_entry["notes"] = []
+        else:
+            app_entry["notes"] = []
+
+    return render_template("volunteers.html", applications=applications)
 
 
 # --- Volunteer Detail ---
 @app.route("/volunteer/<int:app_id>")
 def volunteer_detail(app_id):
     conn = get_db_connection()
-    app = conn.execute("SELECT * FROM applications WHERE id=?", (app_id,)).fetchone()
-    conn.close()
-    if not app:
+    row = conn.execute(
+        "SELECT * FROM applications WHERE id = ?",
+        (app_id,)
+    ).fetchone()
+
+    if not row:
+        conn.close()
         return "Volunteer not found", 404
-    return render_template("review_detail.html", app=app)
+
+    app_entry = dict(row)
+
+    # Parse history JSON
+    history_raw = app_entry.get("history")
+    if isinstance(history_raw, str) and history_raw.strip():
+        try:
+            app_entry["history"] = json.loads(history_raw)
+        except json.JSONDecodeError:
+            app_entry["history"] = []
+    else:
+        app_entry["history"] = []
+
+    # Parse notes JSON
+    notes_raw = app_entry.get("notes")
+    if isinstance(notes_raw, str) and notes_raw.strip():
+        try:
+            app_entry["notes"] = json.loads(notes_raw)
+        except json.JSONDecodeError:
+            app_entry["notes"] = []
+    else:
+        app_entry["notes"] = []
+
+    # Find the opportunity this application belongs to,
+    # so we can send the user back to its Applicants page.
+    opp_row = conn.execute(
+        "SELECT id FROM opportunities WHERE title = ?",
+        (app_entry.get("title", ""),)
+    ).fetchone()
+    conn.close()
+
+    back_opp_id = opp_row["id"] if opp_row else None
+
+    return render_template(
+        "review_detail.html",
+        app=app_entry,
+        back_opp_id=back_opp_id,
+    )
 
 
-# --- Add Admin Note ---
+
+# --- Admin Notes ---
 @app.route("/add_note/<int:app_id>", methods=["POST"])
 def add_note(app_id):
     note_text = request.form.get("note", "").strip()
     if not note_text:
-        return jsonify({"message": "Note cannot be empty."})
+        return jsonify({"error": "Note text is required"}), 400
+
     ts = datetime.now().strftime("%Y-%m-%d %H:%M")
 
     conn = get_db_connection()
-    app = conn.execute("SELECT * FROM applications WHERE id=?", (app_id,)).fetchone()
-    if app:
-        notes = json.loads(app["notes"])
-        history = json.loads(app["history"])
-        notes.append({"note": note_text, "timestamp": ts})
-        history.append({"event": f"Note added: {note_text}", "timestamp": ts})
-        conn.execute("UPDATE applications SET notes=?, history=? WHERE id=?",
-                     (json.dumps(notes), json.dumps(history), app_id))
-        conn.commit()
+    cur = conn.cursor()
+
+    row = cur.execute(
+        "SELECT notes, history FROM applications WHERE id = ?", (app_id,)
+    ).fetchone()
+    if not row:
+        conn.close()
+        return jsonify({"error": "Application not found"}), 404
+
+    notes_raw = row["notes"] or "[]"
+    history_raw = row["history"] or "[]"
+
+    try:
+        notes_list = json.loads(notes_raw)
+    except json.JSONDecodeError:
+        notes_list = []
+
+    try:
+        history_list = json.loads(history_raw)
+    except json.JSONDecodeError:
+        history_list = []
+
+    notes_list.append(
+        {
+            "note": note_text,
+            "timestamp": ts,
+        }
+    )
+    history_list.append(
+        {
+            "event": f"Note added: {note_text}",
+            "timestamp": ts,
+        }
+    )
+
+    cur.execute(
+        """
+        UPDATE applications
+        SET notes = ?, history = ?
+        WHERE id = ?
+        """,
+        (json.dumps(notes_list), json.dumps(history_list), app_id),
+    )
+    conn.commit()
     conn.close()
+
     return jsonify({"message": "Note added successfully."})
 
 

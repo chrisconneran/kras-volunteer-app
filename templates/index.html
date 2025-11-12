@@ -145,34 +145,49 @@
         max-width: 1200px;
         margin: 0 auto;
       }
+
+      /* Preferred contact row */
       .contact-row {
         display: flex;
         align-items: center;
-        gap: 8px;
-        flex-wrap: wrap;
+        gap: 4px;
+        flex-wrap: nowrap;
       }
       .contact-row label {
         margin-bottom: 0;
         font-weight: 500;
-        font-size: 0.75rem;
+        font-size: 0.72rem;
+        white-space: nowrap;
       }
       .contact-row .form-check {
         margin-bottom: 0;
-        font-size: 0.75rem;
+        font-size: 0.7rem;
         display: flex;
         align-items: center;
-        gap: 4px;
+        gap: 3px;
+        white-space: nowrap;
       }
       .contact-row .form-check-input {
         margin-top: 0;
-        transform: scale(0.9);
+        transform: scale(0.85);
       }
       .contact-row i {
         color: #2563eb;
-        font-size: 0.75rem;
+        font-size: 0.7rem;
       }
 
-      /* NEW: match manage layout (title left, tags right) */
+      /* Tighter spacing just for the Volunteer Sign-In form */
+      .signin-form .mb-2 {
+        margin-bottom: 0.15rem !important;
+      }
+
+      .signin-form .form-control-sm {
+        height: 22px;
+        padding-top: 1px;
+        padding-bottom: 1px;
+      }
+
+      /* Title left, tags right */
       .card-title-row {
         display: flex;
         align-items: center;
@@ -186,6 +201,34 @@
         gap: 6px;
         flex-wrap: wrap;
       }
+
+      /* Highlight read-only opportunity fields in the application */
+      .readonly-highlight[readonly] {
+        color: #2563eb;
+        font-weight: 600;
+        background-color: #eef3ff;
+      }
+
+      /* Current assignments grid under sign-in */
+      .volunteer-assignments {
+        margin-top: 6px;
+        max-height: 160px; /* about 3 rows visible */
+        overflow-y: auto;
+        border: 1px solid #ddd;
+        border-radius: 6px;
+        background: white;
+        font-size: 0.75rem;
+      }
+      .volunteer-assignments table {
+        width: 100%;
+        margin-bottom: 0;
+      }
+      .volunteer-assignments thead {
+        position: sticky;
+        top: 0;
+        background: #f1f5ff;
+        z-index: 1;
+      }
     </style>
   </head>
 
@@ -194,41 +237,109 @@
       <div class="hero">
         <img src="{{ url_for('static', filename='kras_logo.png') }}" alt="KRAS Kickers Logo">
         <div class="hero-text">
-          <h1><span style="color:#000;">KRAS Kickers</span> <span style="color:#2563eb;">VOLUNTEER</span></h1>
+          <h1>
+            <span style="color:#000;">KRAS Kickers</span>
+            <span style="color:#2563eb;">VOLUNTEER</span>
+          </h1>
           <p>Make a difference at KRAS Kickers. Volunteer with us to support our mission.</p>
         </div>
       </div>
 
-      <div class="row justify-content-center">
-        <div class="col-md-5">
-          <div class="form-section mb-2">
-            <div class="section-title">Volunteer Sign-In</div>
-            <form id="checkinForm">
-              <div class="mb-2">
-                <label>Email Address</label>
-                <input type="email" name="email" id="check_email" class="form-control form-control-sm" placeholder="you@example.com" required>
-              </div>
-              <div class="row mb-2">
-                <div class="col">
+      <!-- ROW 1: Volunteer Sign-In (full width) -->
+      <div class="row mb-2">
+        <div class="col-12">
+          <div class="form-section">
+            <div class="section-title">
+              Volunteer Sign-In <span class="text-danger">[Step 1]</span>
+            </div>
+            <form id="checkinForm" class="signin-form">
+              <div class="row g-2 mb-2 align-items-end">
+                <div class="col-12 col-lg-3">
+                  <label>Email Address</label>
+                  <input
+                    type="email"
+                    name="email"
+                    id="check_email"
+                    class="form-control form-control-sm"
+                    placeholder="you@example.com"
+                    required>
+                </div>
+                <div class="col-12 col-lg-3">
                   <label>First Name</label>
-                  <input type="text" name="first_name" id="check_first" class="form-control form-control-sm" placeholder="Jane" required>
+                  <input
+                    type="text"
+                    name="first_name"
+                    id="check_first"
+                    class="form-control form-control-sm"
+                    placeholder="Jane"
+                    required>
                 </div>
-                <div class="col">
+                <div class="col-12 col-lg-3">
                   <label>Last Name</label>
-                  <input type="text" name="last_name" id="check_last" class="form-control form-control-sm" placeholder="Doe" required>
+                  <input
+                    type="text"
+                    name="last_name"
+                    id="check_last"
+                    class="form-control form-control-sm"
+                    placeholder="Doe"
+                    required>
+                </div>
+                <div class="col-12 col-lg-3">
+                  <label>Phone Number</label>
+                  <input
+                    type="tel"
+                    name="phone"
+                    id="check_phone"
+                    class="form-control form-control-sm phone-mask"
+                    placeholder="(xxx)xxx-xxxx"
+                    pattern="\(\d{3}\)\d{3}-\d{4}"
+                    title="Enter a 10-digit phone number in format (xxx)xxx-xxxx"
+                    required>
                 </div>
               </div>
-              <button type="submit" class="btn btn-outline-primary w-100 btn-sm">Check Volunteer Status</button>
+              <button type="submit" class="btn btn-outline-primary w-100 btn-sm">
+                Check Volunteer Status
+              </button>
             </form>
             <div id="checkinMessage" class="mt-1 text-center small"></div>
-          </div>
 
+            <!-- Current volunteer assignments (populated after successful sign-in) -->
+            <div id="assignmentsContainer" class="volunteer-assignments d-none">
+              <div class="fw-semibold px-2 pt-1">
+                Current Volunteer Assignments
+              </div>
+              <table class="table table-sm mb-0">
+                <thead>
+                  <tr>
+                    <th>Date Submitted</th>
+                    <th>Title</th>
+                    <th>Time Commitment</th>
+                    <th>Duration</th>
+                    <th>Frequency</th>
+                    <th>Location</th>
+                  </tr>
+                </thead>
+                <tbody id="assignmentsBody">
+                  <!-- rows injected by JavaScript -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ROW 2: Volunteer Application (left) + Opportunities (right) -->
+      <div class="row gx-2 gy-2">
+        <!-- Left: Application -->
+        <div class="col-md-4">
           <div class="form-section">
-           <div class="section-title">Volunteer Application</div>
+            <div class="section-title">
+              Volunteer Application <span class="text-danger">[Step 3 - Complete & Submit]</span>
+            </div>
             <form id="volunteerForm">
               <div class="mb-2">
                 <label>Opportunity Title</label>
-                <input type="text" name="title" id="form_title" class="form-control form-control-sm" readonly>
+                <input type="text" name="title" id="form_title" class="form-control form-control-sm readonly-highlight" readonly>
               </div>
               <div class="row mb-2">
                 <div class="col">
@@ -247,12 +358,19 @@
                 </div>
                 <div class="col-5">
                   <label>Phone Number</label>
-                  <input type="tel" name="phone" id="form_phone" class="form-control form-control-sm" placeholder="(xxx)xxx-xxxx"
-                         pattern="\(\d{3}\)\d{3}-\d{4}" title="Enter a 10-digit phone number in format (xxx)xxx-xxxx">
+                  <input
+                    type="tel"
+                    name="phone"
+                    id="form_phone"
+                    class="form-control form-control-sm phone-mask"
+                    placeholder="(xxx)xxx-xxxx"
+                    pattern="\(\d{3}\)\d{3}-\d{4}"
+                    title="Enter a 10-digit phone number in format (xxx)xxx-xxxx"
+                    required>
                 </div>
               </div>
               <div class="mb-2 contact-row">
-                <label>Preferred Method of Contact:</label>
+                <label>Preferred Contact Method:</label>
                 <div class="form-check form-check-inline">
                   <input class="form-check-input" type="radio" name="contact" value="Email" checked>
                   <i class="fa-solid fa-envelope"></i>
@@ -266,20 +384,24 @@
                 <div class="form-check form-check-inline">
                   <input class="form-check-input" type="radio" name="contact" value="Phone">
                   <i class="fa-solid fa-phone"></i>
-                  <label class="form-check-label">Phone Call</label>
+                  <label class="form-check-label">Phone</label>
                 </div>
               </div>
               <div class="mb-2">
                 <label>Time Commitment</label>
-                <input type="text" name="time" id="form_time" class="form-control form-control-sm">
+                <input type="text" name="time" id="form_time" class="form-control form-control-sm readonly-highlight" readonly>
               </div>
               <div class="mb-2">
                 <label>Duration</label>
-                <input type="text" name="duration" id="form_duration" class="form-control form-control-sm">
+                <input type="text" name="duration" id="form_duration" class="form-control form-control-sm readonly-highlight" readonly>
+              </div>
+              <div class="mb-2">
+                <label>Frequency</label>
+                <input type="text" name="frequency" id="form_frequency" class="form-control form-control-sm readonly-highlight" readonly>
               </div>
               <div class="mb-2">
                 <label>Location</label>
-                <input type="text" name="location" id="form_location" class="form-control form-control-sm" readonly>
+                <input type="text" name="location" id="form_location" class="form-control form-control-sm readonly-highlight" readonly>
               </div>
               <div class="mb-2">
                 <label>Comments / Tell us how you wish to help</label>
@@ -290,9 +412,12 @@
           </div>
         </div>
 
-        <div class="col-md-6">
+        <!-- Right: Opportunities -->
+        <div class="col-md-8">
           <div class="form-section opportunities-box">
-            <div class="section-title text-center">Volunteer Opportunities</div>
+            <div class="section-title text-center">
+              Volunteer Opportunities <span class="text-danger">[Step 2 - Select Opportunity & Apply]</span>
+            </div>
             <div class="scrollable-list">
               {% for opp in opportunities %}
               <div class="opportunity-card">
@@ -301,7 +426,6 @@
                   <img src="{{ url_for('static', filename=opp.image) }}" alt="{{ opp.title }} image">
                   {% endif %}
                   <div class="flex-grow-1">
-                    <!-- Title left, tags right (matches Manage page) -->
                     <div class="card-title-row">
                       <div class="card-title mb-0">{{ opp.title }}</div>
                       <div class="tag-box-inline">
@@ -313,11 +437,17 @@
                       </div>
                     </div>
 
-                    <div class="small-text"><b>Time:</b> {{ opp.time }}</div>
+                    <div class="small-text"><b>Time Commitment:</b> {{ opp.time }}</div>
                     <div class="small-text"><b>Duration:</b> {{ opp.duration }}</div>
+                    {% if opp.frequency %}
+                    <div class="small-text"><b>Frequency:</b> {{ opp.frequency }}</div>
+                    {% endif %}
                     <div class="small-text"><b>Location:</b> {{ opp.location }}</div>
                     {% if opp.requirements %}
                     <div class="small-text"><b>Requirements:</b> {{ opp.requirements }}</div>
+                    {% endif %}
+                    {% if opp.description or opp.desc %}
+                    <div class="small-text"><b>Description:</b> {{ opp.description or opp.desc }}</div>
                     {% endif %}
                   </div>
                 </div>
@@ -326,6 +456,7 @@
                   data-title="{{ opp.title }}" 
                   data-time="{{ opp.time }}" 
                   data-duration="{{ opp.duration }}"
+                  data-frequency="{{ opp.frequency }}"
                   data-location="{{ opp.location }}">
                   Apply Now
                 </button>
@@ -338,19 +469,22 @@
     </div>
 
     <script>
-      // Populate opportunity form
+      // Populate opportunity form when "Apply Now" is clicked
       $(".apply-btn").on("click", function() {
         const title = $(this).data("title");
         const time = $(this).data("time");
         const duration = $(this).data("duration");
+        const frequency = $(this).data("frequency") || "";
         const location = $(this).data("location");
+
         $("#form_title").val(title);
         $("#form_time").val(time);
         $("#form_duration").val(duration);
+        $("#form_frequency").val(frequency);
         $("#form_location").val(location);
+
         $('html, body').animate({ scrollTop: $("#volunteerForm").offset().top - 60 }, 300);
       });
-
 
       // Submit volunteer application
       $("#volunteerForm").on("submit", function(e) {
@@ -365,32 +499,67 @@
         });
       });
 
-
       // Volunteer sign-in check
       $("#checkinForm").on("submit", function(e){
         e.preventDefault(); 
         const email = $("#check_email").val().trim();
         const first = $("#check_first").val().trim();
         const last = $("#check_last").val().trim();
+        const phone = $("#check_phone").val().trim();
+
         $.get("/check", { email: email }, function(resp){
+          // Fill sign-in message and pre-fill application form
           if (resp.exists) {
             $("#checkinMessage").html(`<span class='text-success fw-semibold'>Welcome back, ${resp.first_name}!</span>`);
             $("#form_first").val(resp.first_name);
             $("#form_last").val(resp.last_name);
             $("#form_email").val(resp.email);
+            $("#form_phone").val(resp.phone || phone);
           } else {
             $("#checkinMessage").html("<span class='text-primary'>New volunteer detected. Please complete your application below.</span>");
             $("#form_first").val(first);
             $("#form_last").val(last);
             $("#form_email").val(email);
+            $("#form_phone").val(phone);
+          }
+
+          // If assignments are returned, show them in the grid
+          const container = $("#assignmentsContainer");
+          const body = $("#assignmentsBody");
+          body.empty();
+
+          if (resp.assignments && resp.assignments.length > 0) {
+            resp.assignments.forEach(function(a) {
+              const date =
+                a.submitted_at || a.date_submitted || a.created_at || "";
+              const title = a.title || "";
+              const time = a.time || a.time_commitment || "";
+              const duration = a.duration || "";
+              const frequency = a.frequency || "";
+              const location = a.location || "";
+
+              const row = `
+                <tr>
+                  <td>${date}</td>
+                  <td>${title}</td>
+                  <td>${time}</td>
+                  <td>${duration}</td>
+                  <td>${frequency}</td>
+                  <td>${location}</td>
+                </tr>`;
+              body.append(row);
+            });
+            container.removeClass("d-none");
+          } else {
+            container.addClass("d-none");
           }
         });
       });
 
-      // --- Auto-format phone number (xxx)xxx-xxxx ---
-      const phoneInput = document.getElementById('form_phone');
-      if (phoneInput) {
-        phoneInput.addEventListener('input', function (e) {
+      // Auto-format phone numbers (xxx)xxx-xxxx for any .phone-mask inputs
+      const phoneInputs = document.querySelectorAll('.phone-mask');
+      phoneInputs.forEach(input => {
+        input.addEventListener('input', function (e) {
           let value = e.target.value.replace(/\D/g, '');
           if (value.length > 0) value = '(' + value;
           if (value.length > 4) value = value.slice(0, 4) + ')' + value.slice(4);
@@ -398,24 +567,25 @@
           if (value.length > 13) value = value.slice(0, 13);
           e.target.value = value;
         });
-      }
+      });
     </script>
-<div class="modal fade" id="successModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content">
-      <div class="modal-header bg-success text-white">
-        <h5 class="modal-title fw-bold">Application Submitted Successfully!</h5>
-        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
-      <div class="modal-body">
-        <p id="successText"></p>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-success" data-bs-dismiss="modal">OK</button>
+
+    <div class="modal fade" id="successModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header bg-success text-white">
+            <h5 class="modal-title fw-bold">Application Submitted Successfully!</h5>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <p id="successText"></p>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-success" data-bs-dismiss="modal">OK</button>
+          </div>
+        </div>
       </div>
     </div>
-  </div>
-</div>
 
-</body>
+  </body>
 </html>

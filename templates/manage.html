@@ -59,6 +59,13 @@
         height: 28px;
       }
 
+      /* match small selects to small inputs */
+      .form-select-sm {
+        font-size: 0.8rem;
+        padding: 2px 6px;
+        height: 28px;
+      }
+
       .btn-sm {
         font-size: 0.78rem;
         padding: 3px 6px;
@@ -196,8 +203,18 @@
             <div class="header-subtitle">View, edit, and organize volunteer opportunities</div>
           </div>
         </div>
-        <a href="/closed" class="btn btn-outline-secondary btn-sm">View Closed Opportunities</a>
+
+        <!-- Right-side stacked buttons -->
+        <div class="d-flex flex-column align-items-end gap-1">
+          <a href="/menu" class="btn btn-outline-secondary btn-sm">
+            Back to Volunteer Menu
+          </a>
+          <a href="/closed" class="btn btn-outline-secondary btn-sm">
+            View Closed Opportunities
+          </a>
+        </div>
       </div>
+
 
       <div class="card p-4 mb-3 shadow-sm">
         <h5 class="fw-semibold mb-2">Add a New Opportunity</h5>
@@ -207,17 +224,34 @@
               <label>Title</label>
               <input name="title" class="form-control form-control-sm" placeholder="Title" required>
             </div>
+            <!-- Time Commitment dropdown -->
             <div class="col-md-3">
-              <label>Time</label>
-              <input name="time" class="form-control form-control-sm" placeholder="e.g., 2 hrs/week">
+              <label>Time Commitment</label>
+              <select name="time" class="form-select form-select-sm">
+                <option value="">Select time commitment...</option>
+                <option value="1-2 hours">1-2 hours</option>
+                <option value="2-4 hours">2-4 hours</option>
+                <option value="4-8 hours">4-8 hours</option>
+                <option value="2+ days">2+ days</option>
+                <option value="TBD">TBD</option>
+              </select>
             </div>
+            <!-- Frequency (mode) -->
+            <div class="col-md-3">
+              <label>Frequency</label>
+              <select name="mode" class="form-select form-select-sm">
+                <option value="">Select frequency...</option>
+                <option value="In-Person - At Event">In-Person - At Event</option>
+                <option value="Remote - 1 Time">Remote - 1 Time</option>
+                <option value="Remote - Weekly">Remote - Weekly</option>
+                <option value="Remote - Monthly">Remote - Monthly</option>
+                <option value="As needed - TBD">As needed - TBD</option>
+              </select>
+            </div>
+            <!-- Duration moved here -->
             <div class="col-md-3">
               <label>Duration</label>
               <input name="duration" class="form-control form-control-sm" placeholder="Duration">
-            </div>
-            <div class="col-md-3">
-              <label>Mode</label>
-              <input name="mode" class="form-control form-control-sm" placeholder="Mode">
             </div>
             <div class="col-md-4">
               <label>Description</label>
@@ -277,9 +311,9 @@
                     </div>
                   </div>
 
-                  <div class="small-text"><b>Time:</b> {{ opp.time }}</div>
+                  <div class="small-text"><b>Time Commitment:</b> {{ opp.time }}</div>
                   <div class="small-text"><b>Duration:</b> {{ opp.duration }}</div>
-                  <div class="small-text"><b>Mode:</b> {{ opp.mode }}</div>
+                  <div class="small-text"><b>Frequency:</b> {{ opp.mode }}</div>
                   <div class="small-text"><b>Location:</b> {{ opp.location }}</div>
                   {% if opp.requirements %}
                   <div class="small-text"><b>Requirements:</b> {{ opp.requirements }}</div>
@@ -322,17 +356,33 @@
                   <label>Title</label>
                   <input id="edit_title" name="title" class="form-control" required>
                 </div>
+                <!-- Time Commitment dropdown in modal -->
                 <div class="col-md-3">
-                  <label>Time</label>
-                  <input id="edit_time" name="time" class="form-control">
+                  <label>Time Commitment</label>
+                  <select id="edit_time" name="time" class="form-select">
+                    <option value="">Select time commitment...</option>
+                    <option value="1-2 hours">1-2 hours</option>
+                    <option value="2-4 hours">2-4 hours</option>
+                    <option value="4-8 hours">4-8 hours</option>
+                    <option value="2+ days">2+ days</option>
+                    <option value="TBD">TBD</option>
+                  </select>
                 </div>
+                <!-- Frequency next to Time Commitment -->
                 <div class="col-md-3">
-                  <label>Duration</label>
-                  <input id="edit_duration" name="duration" class="form-control">
+                  <label>Frequency</label>
+                  <select id="edit_mode" name="mode" class="form-select">
+                    <option value="">Select frequency...</option>
+                    <option value="In-Person - At Event">In-Person - At Event</option>
+                    <option value="Remote - 1 Time">Remote - 1 Time</option>
+                    <option value="Remote - Weekly">Remote - Weekly</option>
+                    <option value="Remote - Monthly">Remote - Monthly</option>
+                    <option value="As needed - TBD">As needed - TBD</option>
+                  </select>
                 </div>
                 <div class="col-md-4">
-                  <label>Mode</label>
-                  <input id="edit_mode" name="mode" class="form-control">
+                  <label>Duration</label>
+                  <input id="edit_duration" name="duration" class="form-control">
                 </div>
                 <div class="col-md-4">
                   <label>Location</label>

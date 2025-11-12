@@ -79,7 +79,7 @@
   <body class="p-2">
     <div class="wrap">
 
-      <!-- Updated consistent header -->
+      <!-- Updated header -->
       <div class="header-bar shadow-sm">
         <div class="header-left">
           <img src="{{ url_for('static', filename='kras_logo.png') }}" alt="KRAS Kickers Logo" class="logo">
@@ -88,7 +88,21 @@
             <p>View details, add notes, update status, and review history.</p>
           </div>
         </div>
-        <a href="/volunteers" class="btn btn-outline-primary btn-sm">Back to list</a>
+        <div class="d-flex flex-column flex-sm-row gap-2">
+          <a
+            id="backButton"
+            href="{% if back_opp_id %}
+                     {{ url_for('view_applicants', opp_id=back_opp_id) }}
+                   {% else %}
+                     {{ url_for('volunteers') }}
+                   {% endif %}"
+            class="btn btn-outline-primary btn-sm">
+            Back to View Applications
+          </a>
+          <button id="deleteButton" class="btn btn-outline-danger btn-sm">
+            Delete Application
+          </button>
+        </div>
       </div>
 
       <div class="section">
@@ -168,6 +182,18 @@
         $.post(`/add_note/{{ app.id }}`, { note: note }, function(resp) {
           alert(resp.message);
           location.reload();
+        });
+      });
+
+      // Delete application
+      $("#deleteButton").on("click", function () {
+        if (!confirm("Are you sure you want to permanently delete this application?")) {
+          return;
+        }
+        $.post(`/delete_application/{{ app.id }}`, function(resp) {
+          alert(resp.message);
+          // After delete, go back to the Applicants list (or volunteers list)
+          window.location.href = $("#backButton").attr("href");
         });
       });
     </script>

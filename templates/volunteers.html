@@ -37,6 +37,13 @@
         gap: 12px;
       }
 
+      .header-right {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 6px;
+      }
+
       .logo {
         height: 55px;
         width: auto;
@@ -57,13 +64,17 @@
 
       .search-box {
         max-width: 300px;
-        margin-left: auto;
       }
 
-      .table {
+      .table-wrapper {
         background: white;
         border-radius: 8px;
         box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+        padding: 10px;
+      }
+
+      table.table {
+        margin-bottom: 0;
       }
 
       th,
@@ -80,61 +91,191 @@
         background-color: #dbeafe;
         font-weight: 600;
       }
+
+      th.sortable {
+        cursor: pointer;
+        white-space: nowrap;
+      }
+
+      th.sortable::after {
+        content: " ⇅";
+        font-size: 0.75rem;
+        color: #6b7280;
+      }
+
+      th.sortable[data-sort-dir="asc"]::after {
+        content: " ↑";
+      }
+
+      th.sortable[data-sort-dir="desc"]::after {
+        content: " ↓";
+      }
+
+      .filter-row input {
+        font-size: 0.8rem;
+        padding: 2px 4px;
+        height: 26px;
+      }
     </style>
   </head>
 
   <body class="p-3">
     <div class="container">
 
-      <!-- Updated header bar with logo and title -->
+      <!-- Header bar with logo, title, menu button, and search -->
       <div class="header-bar shadow-sm">
         <div class="header-top">
           <div class="header-left">
             <img src="{{ url_for('static', filename='kras_logo.png') }}" alt="KRAS Kickers Logo" class="logo">
             <div class="header-text">
               <h2>Volunteer Applications Overview</h2>
-              <p>Newest submissions appear first. Search by name or email and click to view details.</p>
+              <p>Newest submissions appear first. Search, sort, and filter applications, then click to view details.</p>
             </div>
           </div>
-          <div class="search-box">
-            <input id="search" type="text" class="form-control form-control-sm" placeholder="Search by name or email">
+          <div class="header-right">
+            <a href="{{ url_for('menu') }}" class="btn btn-outline-primary btn-sm">
+              Back to Volunteer Menu
+            </a>
+            <div class="search-box">
+              <input id="search" type="text" class="form-control form-control-sm" placeholder="Search entire table">
+            </div>
           </div>
         </div>
       </div>
 
       <!-- Applications Table -->
-      <table class="table table-striped table-bordered">
-        <thead>
-          <tr>
-            <th>Date Submitted</th>
-            <th>Name</th>
-            <th>Email</th>
-            <th>Opportunity</th>
-            <th>Status</th>
-            <th>View</th>
-          </tr>
-        </thead>
-        <tbody id="volTable">
-          {% for a in applications %}
-          <tr>
-            <td>{{ a.timestamp }}</td>
-            <td>{{ a.first_name or a.name }} {{ a.last_name or "" }}</td>
-            <td>{{ a.email }}</td>
-            <td>{{ a.title }}</td>
-            <td>{{ a.status }}</td>
-            <td><a class="btn btn-sm btn-outline-primary" href="/volunteer/{{ a.id }}">Open</a></td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+      <div class="table-wrapper">
+        <table class="table table-striped table-bordered">
+          <thead>
+            <tr>
+              <th class="sortable" data-col="0">Date Submitted</th>
+              <th class="sortable" data-col="1">Name</th>
+              <th class="sortable" data-col="2">Email</th>
+              <th class="sortable" data-col="3">Phone</th>
+              <th class="sortable" data-col="4">Preferred Contact</th>
+              <th class="sortable" data-col="5">Opportunity</th>
+              <th class="sortable" data-col="6">Status</th>
+              <th>View</th>
+            </tr>
+            <!-- Filter row (per-column filtering, spreadsheet style) -->
+            <tr class="filter-row">
+              <th><input type="text" class="form-control form-control-sm column-filter" data-col="0" placeholder="Filter date"></th>
+              <th><input type="text" class="form-control form-control-sm column-filter" data-col="1" placeholder="Filter name"></th>
+              <th><input type="text" class="form-control form-control-sm column-filter" data-col="2" placeholder="Filter email"></th>
+              <th><input type="text" class="form-control form-control-sm column-filter" data-col="3" placeholder="Filter phone"></th>
+              <th><input type="text" class="form-control form-control-sm column-filter" data-col="4" placeholder="Filter contact"></th>
+              <th><input type="text" class="form-control form-control-sm column-filter" data-col="5" placeholder="Filter opportunity"></th>
+              <th><input type="text" class="form-control form-control-sm column-filter" data-col="6" placeholder="Filter status"></th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="volTable">
+            {% for a in applications %}
+            <tr>
+              <td>{{ a.timestamp }}</td>
+              <td>{{ a.first_name or a.name }} {{ a.last_name or "" }}</td>
+              <td>{{ a.email }}</td>
+              <td>{{ a.phone }}</td>
+              <td>{{ a.contact }}</td>
+              <td>{{ a.title }}</td>
+              <td>{{ a.status }}</td>
+              <td><a class="btn btn-sm btn-outline-primary" href="/volunteer/{{ a.id }}">Open</a></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
     </div>
 
     <script>
-      // Simple live search filter
+      // Global search across entire row text
       $("#search").on("keyup", function() {
-        const v = $(this).val().toLowerCase();
-        $("#volTable tr").each(function() {
-          $(this).toggle($(this).text().toLowerCase().indexOf(v) > -1);
+        applyFiltersAndSearch();
+      });
+
+      // Per-column filters
+      const columnFilters = document.querySelectorAll(".column-filter");
+      columnFilters.forEach(function(input) {
+        input.addEventListener("input", applyFiltersAndSearch);
+      });
+
+      function applyFiltersAndSearch() {
+        const globalTerm = $("#search").val().toLowerCase();
+        const filters = [];
+
+        columnFilters.forEach(function(input) {
+          const colIndex = parseInt(input.dataset.col, 10);
+          const value = input.value.toLowerCase();
+          if (value) {
+            filters.push({ col: colIndex, val: value });
+          }
+        });
+
+        const rows = document.querySelectorAll("#volTable tr");
+        rows.forEach(function(row) {
+          let show = true;
+
+          // Global search: check full row text
+          if (globalTerm) {
+            const rowText = row.innerText.toLowerCase();
+            if (rowText.indexOf(globalTerm) === -1) {
+              show = false;
+            }
+          }
+
+          // Column-specific filters
+          if (show && filters.length > 0) {
+            for (const f of filters) {
+              const cellText = (row.children[f.col].innerText || "").toLowerCase();
+              if (cellText.indexOf(f.val) === -1) {
+                show = false;
+                break;
+              }
+            }
+          }
+
+          row.style.display = show ? "" : "none";
+        });
+      }
+
+      // Click-to-sort columns
+      const sortableHeaders = document.querySelectorAll("th.sortable");
+      sortableHeaders.forEach(function(th) {
+        th.addEventListener("click", function() {
+          const colIndex = parseInt(th.dataset.col, 10);
+          const tbody = document.getElementById("volTable");
+          const rowsArray = Array.from(tbody.querySelectorAll("tr"));
+
+          const currentDir = th.getAttribute("data-sort-dir");
+          const ascending = currentDir !== "asc"; // toggle
+
+          rowsArray.sort(function(a, b) {
+            const aText = (a.children[colIndex].innerText || "").trim().toLowerCase();
+            const bText = (b.children[colIndex].innerText || "").trim().toLowerCase();
+
+            // Try to sort by date/time if both look like dates
+            const aDate = Date.parse(aText);
+            const bDate = Date.parse(bText);
+            if (!isNaN(aDate) && !isNaN(bDate)) {
+              return ascending ? aDate - bDate : bDate - aDate;
+            }
+
+            if (aText < bText) return ascending ? -1 : 1;
+            if (aText > bText) return ascending ? 1 : -1;
+            return 0;
+          });
+
+          // Clear sort direction on all headers, then set this one
+          sortableHeaders.forEach(function(h) {
+            h.removeAttribute("data-sort-dir");
+          });
+          th.setAttribute("data-sort-dir", ascending ? "asc" : "desc");
+
+          // Re-attach rows in sorted order
+          tbody.innerHTML = "";
+          rowsArray.forEach(function(r) {
+            tbody.appendChild(r);
+          });
         });
       });
     </script>

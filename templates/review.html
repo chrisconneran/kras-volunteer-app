@@ -1,1 +1,146 @@
-<meta http-equiv="refresh" content="0; URL=/volunteers">
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Volunteer Review & Assignment</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <style>
+      body {
+        background-color: #f8f9fc;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      }
+
+      .hero {
+        background-color: #e9f0ff;
+        text-align: center;
+        padding: 10px 20px;
+        margin-bottom: 8px;
+        border-radius: 8px;
+      }
+
+      .hero h1 {
+        font-weight: 700;
+        font-size: 1.6rem;
+        margin-bottom: 3px;
+      }
+
+      .hero p {
+        font-size: 0.85rem;
+        color: #555;
+        margin-bottom: 0;
+      }
+
+      .review-section {
+        background: white;
+        border-radius: 8px;
+        padding: 10px 12px;
+        border: 2px solid #2563eb;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+      }
+
+      .section-title {
+        font-weight: 600;
+        font-size: 0.95rem;
+        margin-bottom: 8px;
+        text-align: center;
+      }
+
+      .scrollable-list {
+        max-height: 78vh;
+        overflow-y: auto;
+        padding-right: 6px;
+      }
+
+      .scrollable-list::-webkit-scrollbar {
+        width: 8px;
+      }
+
+      .scrollable-list::-webkit-scrollbar-thumb {
+        background: #bbb;
+        border-radius: 4px;
+      }
+
+      .application-card {
+        background: white;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        padding: 8px 10px;
+        margin-bottom: 10px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+      }
+
+      .application-card:hover {
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      }
+
+      .small-text {
+        font-size: 0.82rem;
+        color: #444;
+        margin-bottom: 3px;
+      }
+
+      .status-select {
+        font-size: 0.8rem;
+        padding: 2px 6px;
+      }
+
+      .btn-outline-primary {
+        font-size: 0.75rem;
+        padding: 2px 8px;
+      }
+    </style>
+  </head>
+
+  <body class="p-2">
+    <div class="container-fluid" style="max-width: 1000px;">
+      <div class="hero">
+        <h1>Volunteer Review & Assignment</h1>
+        <p>Manage submitted applications, update status, and assign volunteers to roles.</p>
+      </div>
+
+      <div class="review-section">
+        <div class="section-title">Submitted Volunteer Applications</div>
+        <div class="scrollable-list">
+          {% if applications %}
+            {% for app in applications %}
+            <div class="application-card">
+              <div class="small-text"><b>Name:</b> {{ app.first_name }} {{ app.last_name }}</div>
+              <div class="small-text"><b>Email:</b> {{ app.email }}</div>
+              <div class="small-text"><b>Preferred Contact:</b> {{ app.contact }}</div>
+              <div class="small-text"><b>Opportunity:</b> {{ app.title }}</div>
+              <div class="small-text"><b>Time Commitment:</b> {{ app.time }}</div>
+              <div class="small-text"><b>Duration:</b> {{ app.duration }}</div>
+              <div class="small-text"><b>Location:</b> {{ app.location }}</div>
+              {% if app.comments %}
+              <div class="small-text"><b>Comments:</b> {{ app.comments }}</div>
+              {% endif %}
+              <div class="d-flex align-items-center justify-content-between mt-2">
+                <div class="small-text mb-0"><b>Status:</b></div>
+                <select class="form-select form-select-sm status-select w-auto" data-id="{{ app.id }}">
+                  <option value="Pending" {% if app.status == 'Pending' %}selected{% endif %}>Pending</option>
+                  <option value="Assigned" {% if app.status == 'Assigned' %}selected{% endif %}>Assigned</option>
+                  <option value="Completed" {% if app.status == 'Completed' %}selected{% endif %}>Completed</option>
+                </select>
+                <a href="mailto:{{ app.email }}" class="btn btn-outline-primary btn-sm">Email</a>
+              </div>
+            </div>
+            {% endfor %}
+          {% else %}
+            <p class="text-muted text-center mt-3">No volunteer applications found.</p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <script>
+      $(".status-select").change(function(){
+        const id = $(this).data("id");
+        const status = $(this).val();
+        $.post(`/update_status/${id}`, {status: status}, function(resp){
+          alert(resp.message);
+        });
+      });
+    </script>
+  </body>
+</html>
