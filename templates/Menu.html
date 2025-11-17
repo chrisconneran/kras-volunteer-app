@@ -48,6 +48,10 @@
         margin-bottom: 10px;
         font-size: 1rem;
       }
+      .locked {
+        pointer-events: none;
+        opacity: 0.45;
+      }
     </style>
   </head>
 
@@ -62,20 +66,91 @@
       </div>
 
       <div class="menu-container">
+
+        <!-- ADMIN EMAIL VALIDATION PANEL -->
+        <div id="adminLoginPanel" class="mb-3">
+          <label for="admin_email" class="form-label fw-semibold">Admin Email (KRAS Kickers Only)</label>
+          <input type="email" id="admin_email" class="form-control" placeholder="you@kraskickers.org">
+
+          <button id="adminSendBtn" class="btn btn-primary mt-2">
+            Send Verification Email
+          </button>
+
+          <div id="adminMessage" class="mt-2 text-center small"></div>
+        </div>
+
         <h4 class="text-center mb-3 text-primary">Select an Option</h4>
 
-        <!-- Link to main volunteer application portal -->
-        <a href="{{ url_for('index') }}" class="btn btn-primary">1️⃣ Volunteer Application Portal</a>
+        <!-- Buttons wrapped in a section we lock/unlock -->
+        <div id="menuOptions">
 
-        <!-- Link to view all volunteer applications -->
-        <a href="{{ url_for('volunteers') }}" class="btn btn-outline-primary">2️⃣ View Volunteer Applications</a>
+          <a href="{{ url_for('index') }}" class="btn btn-primary menu-btn">
+            1️⃣ Volunteer Application Portal
+          </a>
 
-        <!-- Link to manage volunteer opportunities -->
-        <a href="{{ url_for('manage') }}" class="btn btn-outline-primary">3️⃣ Manage Volunteer Opportunities</a>
+          <a href="{{ url_for('volunteers') }}" class="btn btn-outline-primary menu-btn">
+            2️⃣ View Volunteer Applications
+          </a>
 
-        <!-- Refresh now points back to index (since menu route is gone) -->
-        <a href="{{ url_for('index') }}" class="btn btn-secondary mt-3">🔁 Refresh Menu</a>
+          <a href="{{ url_for('manage') }}" class="btn btn-outline-primary menu-btn">
+            3️⃣ Manage Volunteer Opportunities
+          </a>
+
+          <a href="{{ url_for('index') }}" class="btn btn-secondary mt-3 menu-btn">
+            🔁 Refresh Menu
+          </a>
+
+        </div>
       </div>
     </div>
+
+    <script>
+      // Lock menu options until admin verification
+      function lockMenu() {
+        document.getElementById("menuOptions").classList.add("locked");
+      }
+      function unlockMenu() {
+        document.getElementById("menuOptions").classList.remove("locked");
+      }
+
+      // Read "admin_verified" from URL
+      const params = new URLSearchParams(window.location.search);
+
+      // If verified, unlock menu + hide login panel
+      if (params.get("admin_verified") === "1") {
+        unlockMenu();
+        document.getElementById("adminLoginPanel").style.display = "none";
+      } else {
+        lockMenu();
+      }
+
+      // Send admin verification request
+      document.getElementById("adminSendBtn").addEventListener("click", function() {
+        const email = document.getElementById("admin_email").value.trim().toLowerCase();
+        const msgBox = document.getElementById("adminMessage");
+
+        if (!email.endsWith("@kraskickers.org")) {
+          msgBox.innerHTML = "<span class='text-danger'>Admin access requires a @kraskickers.org email address.</span>";
+          return;
+        }
+
+        fetch("/admin_request_access", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: email })
+        })
+        .then(r => r.json())
+        .then(resp => {
+          if (resp.error) {
+            msgBox.innerHTML = "<span class='text-danger'>" + resp.error + "</span>";
+          } else {
+            msgBox.innerHTML = "<span class='text-success'>" + resp.message + "</span>";
+          }
+        })
+        .catch(err => {
+          msgBox.innerHTML = "<span class='text-danger'>Error sending request.</span>";
+        });
+      });
+    </script>
   </body>
 </html>
