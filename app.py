@@ -337,16 +337,21 @@ def index():
         form_email = request.form.get("email", "").strip().lower()
         verified_email = session.get("verified_email", "").strip().lower()
 
-        if not session.get("email_verified"):
+        # Allow fallback for verified users whose email field is disabled/read-only
+        if not form_email:
+            form_email = verified_email
+
+        if form_email != verified_email:
             return (
                 jsonify(
                     {
                         "status": "error",
-                        "message": "Please verify your email before submitting the application.",
+                        "message": "The email used in the application does not match the verified email.",
                     }
                 ),
                 400,
             )
+
 
         if form_email != verified_email:
             return (
@@ -768,39 +773,40 @@ def check_volunteer():
                 "activation_message"
             ] = "We just sent a verification email. Please click the link in that email so you can submit your application."
 
-        if response["exists"] and response["activation_message"] == "":
-            assignment_rows = conn.execute(
-                """
-                SELECT
-                    a.timestamp AS submitted_at,
-                    a.title,
-                    o.time        AS time_commitment,
-                    o.duration    AS duration,
-                    o.mode        AS frequency,
-                    o.location    AS location
-                FROM applications a
-                LEFT JOIN opportunities o
-                    ON a.title = o.title
-                WHERE
-                    LOWER(a.email) = ?
-                    AND a.status = 'Assigned'
-                ORDER BY a.timestamp DESC
-                """,
-                (email,),
-            ).fetchall()
+            # If the user exists AND is already verified, load assignments
+    if rows and session.get("email_verified") and session.get("verified_email", "").strip().lower() == email:
+        assignment_rows = conn.execute(
+            """
+            SELECT
+                a.timestamp AS submitted_at,
+                a.title,
+                o.time        AS time_commitment,
+                o.duration    AS duration,
+                o.mode        AS frequency,
+                o.location    AS location
+            FROM applications a
+            LEFT JOIN opportunities o
+                ON a.title = o.title
+            WHERE
+                LOWER(a.email) = ?
+                AND a.status = 'Assigned'
+            ORDER BY a.timestamp DESC
+            """,
+            (email,),
+        ).fetchall()
 
-            assignments = [
-                {
-                    "submitted_at": row["submitted_at"],
-                    "title": row["title"],
-                    "time_commitment": row["time_commitment"],
-                    "duration": row["duration"],
-                    "frequency": row["frequency"],
-                    "location": row["location"],
-                }
-                for row in assignment_rows
-            ]
-            response["assignments"] = assignments
+        assignments = [
+            {
+                "submitted_at": row["submitted_at"],
+                "title": row["title"],
+                "time_commitment": row["time_commitment"],
+                "duration": row["duration"],
+                "frequency": row["frequency"],
+                "location": row["location"],
+            }
+            for row in assignment_rows
+        ]
+        response["assignments"] = assignments
 
     else:
         send_activation_email(email)
@@ -1061,3 +1067,4 @@ def add_note(app_id):
 
 if __name__ == "__main__":
     app.run(debug=True)
+    
