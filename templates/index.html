@@ -229,6 +229,12 @@
         background: #f1f5ff;
         z-index: 1;
       }
+
+      /* Lock visual for sections 2 and 3 */
+      .locked {
+        pointer-events: none;
+        opacity: 0.45;
+      }
     </style>
   </head>
 
@@ -329,7 +335,7 @@
       </div>
 
       <!-- ROW 2: Volunteer Application (left) + Opportunities (right) -->
-      <div class="row gx-2 gy-2">
+      <div id="lockedSections" class="row gx-2 gy-2">
         <!-- Left: Application -->
         <div class="col-md-4">
           <div class="form-section">
@@ -468,9 +474,47 @@
       </div>
     </div>
 
+
+
     <script>
+
+      // Disable/enable the application form until email is verified
+      function setApplicationEnabled(enabled) {
+        $("#volunteerForm :input").prop("disabled", !enabled);
+      }
+
+      // Lock and unlock all sections (Steps 2 and 3)
+      function lockAllSections() {
+        $("#lockedSections").addClass("locked");
+        setApplicationEnabled(false);
+      }
+
+      function unlockAllSections() {
+        $("#lockedSections").removeClass("locked");
+        setApplicationEnabled(true);
+      }
+
+      // Lock everything on page load
+      lockAllSections();
+
+      // If coming back from email verification (?verified=1), unlock the form and sections
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("verified") === "1") {
+        unlockAllSections();
+        $("#checkinMessage").html(
+          "<span class='text-success fw-bold'>Email verified! You may now review opportunities and submit your application.</span>"
+        );
+      }
+
       // Populate opportunity form when "Apply Now" is clicked
       $(".apply-btn").on("click", function() {
+
+        // Require verification before selecting an opportunity
+        if (params.get("verified") !== "1") {
+          alert("Use Step 1 to sign in and verify your email before selecting an opportunity.");
+          return;
+        }
+
         const title = $(this).data("title");
         const time = $(this).data("time");
         const duration = $(this).data("duration");
@@ -486,18 +530,31 @@
         $('html, body').animate({ scrollTop: $("#volunteerForm").offset().top - 60 }, 300);
       });
 
+
       // Submit volunteer application
       $("#volunteerForm").on("submit", function(e) {
         e.preventDefault();
-        $.post("/", $(this).serialize(), function(resp) {
-          $("#successText").html(
-            `We have received your application to volunteer for: <b>${resp.title}</b>.<br><br>
-            You will be contacted by a KRAS Kickers volunteer coordinator within 48 hours via your preferred method of contact.<br><br>
-            Thank you!`
-          );
-          new bootstrap.Modal(document.getElementById("successModal")).show();
+
+        $.ajax({
+          url: "/",
+          method: "POST",
+          data: $(this).serialize(),
+          success: function(resp) {
+            $("#successText").html(
+              `We have received your application to volunteer for: <b>${resp.title}</b>.<br><br>
+              You will be contacted by a KRAS Kickers volunteer coordinator within 48 hours via your preferred method of contact.<br><br>
+              Thank you!`
+            );
+            new bootstrap.Modal(document.getElementById("successModal")).show();
+          },
+          error: function(xhr) {
+            const data = xhr.responseJSON;
+            alert(data.error || "Your application could not be submitted.");
+          }
         });
       });
+
+
 
       // Volunteer sign-in check
       $("#checkinForm").on("submit", function(e){
@@ -525,8 +582,12 @@
 
           if (resp.activation_message) {
             $("#checkinMessage").append("<br>" + resp.activation_message);
+            // Keep sections locked until verification
+            lockAllSections();
+          } else {
+            // If for some reason there is no activation message, allow interaction
+            unlockAllSections();
           }
-
 
           // If assignments are returned, show them in the grid
           const container = $("#assignmentsContainer");
