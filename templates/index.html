@@ -335,7 +335,7 @@
       </div>
 
       <!-- ROW 2: Volunteer Application (left) + Opportunities (right) -->
-      <div id="lockedSections" class="row gx-2 gy-2 d-none">
+      <div id="lockedSections" class="row gx-2 gy-2">
         <!-- Left: Application -->
         <div class="col-md-4">
           <div class="form-section">
@@ -477,44 +477,41 @@
 
 
     <script>
-      // Manage locking/unlocking of sections 2 and 3 and the application form
+
+      // Disable/enable the application form until email is verified
       function setApplicationEnabled(enabled) {
         $("#volunteerForm :input").prop("disabled", !enabled);
       }
 
+      // Lock and unlock all sections (Steps 2 and 3)
       function lockAllSections() {
-        $("#lockedSections").addClass("locked").addClass("d-none");
+        $("#lockedSections").addClass("locked");
         setApplicationEnabled(false);
       }
 
       function unlockAllSections() {
-        $("#lockedSections").removeClass("locked").removeClass("d-none");
+        $("#lockedSections").removeClass("locked");
         setApplicationEnabled(true);
       }
 
-      const params = new URLSearchParams(window.location.search);
-
-      // On first load: keep everything except Step 1 hidden and locked
+      // Lock everything on page load
       lockAllSections();
 
-      // If returning from email verification (?verified=1), unlock sections
+      // If coming back from email verification (?verified=1), unlock the form and sections
+      const params = new URLSearchParams(window.location.search);
       if (params.get("verified") === "1") {
         unlockAllSections();
         $("#checkinMessage").html(
-          "<span class='text-success fw-bold'>Email verified! You may now review opportunities, see your assignments, and submit your application.</span>"
+          "<span class='text-success fw-bold'>Email verified! You may now review opportunities and submit your application.</span>"
         );
-        // Make Step 1 identity fields read-only so they remain visible but not editable
-        $("#check_email").prop("readonly", true);
-        $("#check_first").prop("readonly", true);
-        $("#check_last").prop("readonly", true);
-        $("#check_phone").prop("readonly", true);
       }
 
       // Populate opportunity form when "Apply Now" is clicked
       $(".apply-btn").on("click", function() {
+
         // Require verification before selecting an opportunity
         if (params.get("verified") !== "1") {
-          alert("Please verify your email (Step 1) before selecting an opportunity.");
+          alert("Use Step 1 to sign in and verify your email before selecting an opportunity.");
           return;
         }
 
@@ -533,6 +530,7 @@
         $('html, body').animate({ scrollTop: $("#volunteerForm").offset().top - 60 }, 300);
       });
 
+
       // Submit volunteer application
       $("#volunteerForm").on("submit", function(e) {
         e.preventDefault();
@@ -543,18 +541,20 @@
           data: $(this).serialize(),
           success: function(resp) {
             $("#successText").html(
-              "We have received your application to volunteer for: <b>" + resp.title + "</b>.<br><br>" +
-              "You will be contacted by a KRAS Kickers volunteer coordinator within 48 hours via your preferred method of contact.<br><br>" +
-              "Thank you!"
+              `We have received your application to volunteer for: <b>${resp.title}</b>.<br><br>
+              You will be contacted by a KRAS Kickers volunteer coordinator within 48 hours via your preferred method of contact.<br><br>
+              Thank you!`
             );
             new bootstrap.Modal(document.getElementById("successModal")).show();
           },
           error: function(xhr) {
-            var data = xhr.responseJSON || {};
+            const data = xhr.responseJSON;
             alert(data.error || "Your application could not be submitted.");
           }
         });
       });
+
+
 
       // Volunteer sign-in check
       $("#checkinForm").on("submit", function(e){
@@ -567,37 +567,34 @@
         $.get("/check", { email: email }, function(resp){
           // Fill sign-in message and pre-fill application form
           if (resp.exists) {
-            $("#checkinMessage").html("<span class='text-success fw-semibold'>Welcome back, " + resp.first_name + "!</span>");
+            $("#checkinMessage").html(`<span class='text-success fw-semibold'>Welcome back, ${resp.first_name}!</span>`);
             $("#form_first").val(resp.first_name);
             $("#form_last").val(resp.last_name);
             $("#form_email").val(resp.email);
             $("#form_phone").val(resp.phone || phone);
           } else {
-            $("#checkinMessage").html("<span class='text-primary'>New volunteer detected. Please check your email to verify, then complete your application.</span>");
+            $("#checkinMessage").html("<span class='text-primary'>New volunteer detected. Please complete your application below.</span>");
             $("#form_first").val(first);
             $("#form_last").val(last);
             $("#form_email").val(email);
             $("#form_phone").val(phone);
           }
 
-          // If an activation message is returned, keep sections locked and hidden until verification
           if (resp.activation_message) {
             $("#checkinMessage").append("<br>" + resp.activation_message);
+            // Keep sections locked until verification
             lockAllSections();
-            $("#assignmentsContainer").addClass("d-none");
           } else {
-            // Only unlock sections automatically if already verified on the server
-            if (params.get("verified") === "1") {
-              unlockAllSections();
-            }
+            // If for some reason there is no activation message, allow interaction
+            unlockAllSections();
           }
 
-          // Assignments: only show after verification
+          // If assignments are returned, show them in the grid
           const container = $("#assignmentsContainer");
           const body = $("#assignmentsBody");
           body.empty();
 
-          if (params.get("verified") === "1" && resp.assignments && resp.assignments.length > 0) {
+          if (resp.assignments && resp.assignments.length > 0) {
             resp.assignments.forEach(function(a) {
               const date =
                 a.submitted_at || a.date_submitted || a.created_at || "";
@@ -607,16 +604,15 @@
               const frequency = a.frequency || "";
               const location = a.location || "";
 
-              const row = [
-                "<tr>",
-                  "<td>" + date + "</td>",
-                  "<td>" + title + "</td>",
-                  "<td>" + time + "</td>",
-                  "<td>" + duration + "</td>",
-                  "<td>" + frequency + "</td>",
-                  "<td>" + location + "</td>",
-                "</tr>"
-              ].join("");
+              const row = `
+                <tr>
+                  <td>${date}</td>
+                  <td>${title}</td>
+                  <td>${time}</td>
+                  <td>${duration}</td>
+                  <td>${frequency}</td>
+                  <td>${location}</td>
+                </tr>`;
               body.append(row);
             });
             container.removeClass("d-none");
