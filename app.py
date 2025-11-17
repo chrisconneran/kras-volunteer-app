@@ -17,11 +17,40 @@ serializer = URLSafeTimedSerializer(app.secret_key)
 from datetime import timedelta
 app.permanent_session_lifetime = timedelta(minutes=30)
 
+# Session timeout settings
+ADMIN_TIMEOUT_SECONDS = 30 * 60       # 30 minutes
+VOLUNTEER_TIMEOUT_SECONDS = 60 * 60   # 60 minutes
 
 
 def require_admin():
     if not session.get("admin_verified"):
         return redirect(url_for("menu"))
+
+
+# Enforce session timeouts for admin and volunteers
+@app.before_request
+def refresh_session_timeouts():
+    now_ts = datetime.now().timestamp()
+
+    # Admin timeout
+    if session.get("admin_verified"):
+        last = session.get("admin_last_seen")
+        if last is not None and now_ts - last > ADMIN_TIMEOUT_SECONDS:
+            session.pop("admin_verified", None)
+            session.pop("admin_email", None)
+            session.pop("admin_last_seen", None)
+        else:
+            session["admin_last_seen"] = now_ts
+
+    # Volunteer timeout
+    if session.get("email_verified"):
+        last = session.get("email_last_seen")
+        if last is not None and now_ts - last > VOLUNTEER_TIMEOUT_SECONDS:
+            session.pop("email_verified", None)
+            session.pop("verified_email", None)
+            session.pop("email_last_seen", None)
+        else:
+            session["email_last_seen"] = now_ts
 
 
 # --- SQLite setup ---
@@ -297,9 +326,8 @@ def activate_email(token):
 
     session["email_verified"] = True
     session["verified_email"] = email
+    session["email_last_seen"] = datetime.now().timestamp()
     return redirect(url_for("index") + "?verified=1")
-
-
 
 
 # --- HOME PAGE (Volunteer Opportunities + Application Form) ---
@@ -359,7 +387,6 @@ def index():
         opp["frequency"] = opp.get("mode", "")
 
     return render_template("index.html", opportunities=opportunities)
-
 
 
 # --- Manage Active Opportunities ---
@@ -456,26 +483,22 @@ def admin_activate(token):
         return "Invalid or expired admin activation link.", 400
 
     session["admin_verified"] = True
-    session.permanent = True
+    session["admin_email"] = email
+    session["admin_last_seen"] = datetime.now().timestamp()
 
-
-    # Return HTML that closes the new tab and refreshes the original tab
     return """
     <html>
     <body>
         <p>Admin verified successfully. You may close this window.</p>
         <script>
-            // Refresh opener tab if it exists
             if (window.opener) {
                 window.opener.location.reload();
             }
-            // Close this tab
             window.close();
         </script>
     </body>
     </html>
     """
-
 
 
 # --- Update Opportunity ---
@@ -529,7 +552,6 @@ def update_opportunity(opp_id):
     conn.commit()
     conn.close()
     return jsonify({"message": "Opportunity updated!"})
-
 
 
 # --- Delete Opportunity ---
@@ -886,8 +908,6 @@ def delete_application(app_id):
     return jsonify({"message": "Application deleted successfully."})
 
 
-
-
 # --- Volunteers Overview ---
 @app.route("/volunteers")
 def volunteers():
@@ -973,7 +993,6 @@ def volunteer_detail(app_id):
         app=app_entry,
         back_opp_id=back_opp_id,
     )
-
 
 
 # --- Admin Notes ---
