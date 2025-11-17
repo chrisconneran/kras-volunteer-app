@@ -15,9 +15,6 @@ app.secret_key = "supersecretkey"
 serializer = URLSafeTimedSerializer(app.secret_key)
 
 from datetime import timedelta
-app.permanent_session_lifetime = timedelta(minutes=30)
-
-# Session timeout settings
 ADMIN_TIMEOUT_SECONDS = 30 * 60       # 30 minutes
 VOLUNTEER_TIMEOUT_SECONDS = 60 * 60   # 60 minutes
 
@@ -341,17 +338,16 @@ def index():
         if not form_email:
             form_email = verified_email
 
-        if form_email != verified_email:
+        if not session.get("email_verified"):
             return (
                 jsonify(
                     {
                         "status": "error",
-                        "message": "The email used in the application does not match the verified email.",
+                        "message": "Please verify your email before submitting the application.",
                     }
                 ),
                 400,
             )
-
 
         if form_email != verified_email:
             return (
@@ -497,7 +493,7 @@ def admin_activate(token):
         <p>Admin verified successfully. You may close this window.</p>
         <script>
             if (window.opener) {
-                window.opener.location.reload();
+                try { window.opener.location.href = "/menu?admin_verified=1"; } catch (e) {}
             }
             window.close();
         </script>
@@ -773,41 +769,39 @@ def check_volunteer():
                 "activation_message"
             ] = "We just sent a verification email. Please click the link in that email so you can submit your application."
 
-            # If the user exists AND is already verified, load assignments
-    if rows and session.get("email_verified") and session.get("verified_email", "").strip().lower() == email:
-        assignment_rows = conn.execute(
-            """
-            SELECT
-                a.timestamp AS submitted_at,
-                a.title,
-                o.time        AS time_commitment,
-                o.duration    AS duration,
-                o.mode        AS frequency,
-                o.location    AS location
-            FROM applications a
-            LEFT JOIN opportunities o
-                ON a.title = o.title
-            WHERE
-                LOWER(a.email) = ?
-                AND a.status = 'Assigned'
-            ORDER BY a.timestamp DESC
-            """,
-            (email,),
-        ).fetchall()
+        if session_verified and session_email == email:
+            assignment_rows = conn.execute(
+                """
+                SELECT
+                    a.timestamp AS submitted_at,
+                    a.title,
+                    o.time        AS time_commitment,
+                    o.duration    AS duration,
+                    o.mode        AS frequency,
+                    o.location    AS location
+                FROM applications a
+                LEFT JOIN opportunities o
+                    ON a.title = o.title
+                WHERE
+                    LOWER(a.email) = ?
+                    AND a.status = 'Assigned'
+                ORDER BY a.timestamp DESC
+                """,
+                (email,),
+            ).fetchall()
 
-        assignments = [
-            {
-                "submitted_at": row["submitted_at"],
-                "title": row["title"],
-                "time_commitment": row["time_commitment"],
-                "duration": row["duration"],
-                "frequency": row["frequency"],
-                "location": row["location"],
-            }
-            for row in assignment_rows
-        ]
-        response["assignments"] = assignments
-
+            assignments = [
+                {
+                    "submitted_at": row["submitted_at"],
+                    "title": row["title"],
+                    "time_commitment": row["time_commitment"],
+                    "duration": row["duration"],
+                    "frequency": row["frequency"],
+                    "location": row["location"],
+                }
+                for row in assignment_rows
+            ]
+            response["assignments"] = assignments
     else:
         send_activation_email(email)
         response[
@@ -1067,4 +1061,3 @@ def add_note(app_id):
 
 if __name__ == "__main__":
     app.run(debug=True)
-    

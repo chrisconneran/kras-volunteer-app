@@ -105,6 +105,15 @@
     </div>
 
     <script>
+  // This listens for messages coming from the admin popup window
+  window.addEventListener("message", function(event) {
+    if (event.data === "admin_verified") {
+      window.location.href = "/menu?admin_verified=1";
+    }
+    });
+    </script>
+
+    <script>
       // Lock menu options until admin verification
       function lockMenu() {
         document.getElementById("menuOptions").classList.add("locked");
