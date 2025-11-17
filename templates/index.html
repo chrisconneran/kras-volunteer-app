@@ -309,7 +309,7 @@
             </form>
             <div id="checkinMessage" class="mt-1 text-center small"></div>
 
-            <!-- Current volunteer assignments (populated after successful sign-in) -->
+            <!-- Current volunteer assignments (populated after successful sign-in and verification) -->
             <div id="assignmentsContainer" class="volunteer-assignments d-none">
               <div class="fw-semibold px-2 pt-1">
                 Current Volunteer Assignments
@@ -477,13 +477,11 @@
 
 
     <script>
-
-      // Disable/enable the application form until email is verified
+      // Manage locking/unlocking of sections 2 and 3 and the application form
       function setApplicationEnabled(enabled) {
         $("#volunteerForm :input").prop("disabled", !enabled);
       }
 
-      // Lock and unlock all sections (Steps 2 and 3)
       function lockAllSections() {
         $("#lockedSections").addClass("locked");
         setApplicationEnabled(false);
@@ -494,24 +492,85 @@
         setApplicationEnabled(true);
       }
 
-      // Lock everything on page load
+      const params = new URLSearchParams(window.location.search);
+
+      // Restore any stored volunteer info (used after verification)
+      let storedVolunteer = null;
+      try {
+        const stored = localStorage.getItem("krasVolunteer");
+        if (stored) {
+          storedVolunteer = JSON.parse(stored);
+        }
+      } catch (e) {
+        storedVolunteer = null;
+      }
+
+      // On first load: keep sections 2–3 visible but locked
       lockAllSections();
 
-      // If coming back from email verification (?verified=1), unlock the form and sections
-      const params = new URLSearchParams(window.location.search);
+      // If returning from email verification (?verified=1), unlock sections and restore data
       if (params.get("verified") === "1") {
         unlockAllSections();
         $("#checkinMessage").html(
-          "<span class='text-success fw-bold'>Email verified! You may now review opportunities and submit your application.</span>"
+          "<span class='text-success fw-bold'>Email verified! You may now review opportunities, see your assignments, and submit your application.</span>"
         );
+        // Make Step 1 identity fields read-only so they remain visible but not editable
+        $("#check_email").prop("readonly", true);
+        $("#check_first").prop("readonly", true);
+        $("#check_last").prop("readonly", true);
+        $("#check_phone").prop("readonly", true);
+
+        // If we stored data from the original check, restore it
+        if (storedVolunteer) {
+          // Step 1
+          $("#check_email").val(storedVolunteer.email || "");
+          $("#check_first").val(storedVolunteer.first_name || "");
+          $("#check_last").val(storedVolunteer.last_name || "");
+          $("#check_phone").val(storedVolunteer.phone || "");
+
+          // Step 3 (application)
+          $("#form_first").val(storedVolunteer.first_name || "");
+          $("#form_last").val(storedVolunteer.last_name || "");
+          $("#form_email").val(storedVolunteer.email || "");
+          $("#form_phone").val(storedVolunteer.phone || "");
+
+          // Assignments grid
+          const container = $("#assignmentsContainer");
+          const body = $("#assignmentsBody");
+          body.empty();
+
+          if (storedVolunteer.assignments && storedVolunteer.assignments.length > 0) {
+            storedVolunteer.assignments.forEach(function(a) {
+              const date =
+                a.submitted_at || a.date_submitted || a.created_at || "";
+              const title = a.title || "";
+              const time = a.time || a.time_commitment || "";
+              const duration = a.duration || "";
+              const frequency = a.frequency || "";
+              const location = a.location || "";
+
+              const row = "<tr>" +
+                            "<td>" + date + "</td>" +
+                            "<td>" + title + "</td>" +
+                            "<td>" + time + "</td>" +
+                            "<td>" + duration + "</td>" +
+                            "<td>" + frequency + "</td>" +
+                            "<td>" + location + "</td>" +
+                          "</tr>";
+              body.append(row);
+            });
+            container.removeClass("d-none");
+          } else {
+            container.addClass("d-none");
+          }
+        }
       }
 
       // Populate opportunity form when "Apply Now" is clicked
       $(".apply-btn").on("click", function() {
-
         // Require verification before selecting an opportunity
         if (params.get("verified") !== "1") {
-          alert("Use Step 1 to sign in and verify your email before selecting an opportunity.");
+          alert("Please verify your email (Step 1) before selecting an opportunity.");
           return;
         }
 
@@ -530,7 +589,6 @@
         $('html, body').animate({ scrollTop: $("#volunteerForm").offset().top - 60 }, 300);
       });
 
-
       // Submit volunteer application
       $("#volunteerForm").on("submit", function(e) {
         e.preventDefault();
@@ -541,20 +599,18 @@
           data: $(this).serialize(),
           success: function(resp) {
             $("#successText").html(
-              `We have received your application to volunteer for: <b>${resp.title}</b>.<br><br>
-              You will be contacted by a KRAS Kickers volunteer coordinator within 48 hours via your preferred method of contact.<br><br>
-              Thank you!`
+              "We have received your application to volunteer for: <b>" + resp.title + "</b>.<br><br>" +
+              "You will be contacted by a KRAS Kickers volunteer coordinator within 48 hours via your preferred method of contact.<br><br>" +
+              "Thank you!"
             );
             new bootstrap.Modal(document.getElementById("successModal")).show();
           },
           error: function(xhr) {
-            const data = xhr.responseJSON;
+            var data = xhr.responseJSON || {};
             alert(data.error || "Your application could not be submitted.");
           }
         });
       });
-
-
 
       // Volunteer sign-in check
       $("#checkinForm").on("submit", function(e){
@@ -567,34 +623,55 @@
         $.get("/check", { email: email }, function(resp){
           // Fill sign-in message and pre-fill application form
           if (resp.exists) {
-            $("#checkinMessage").html(`<span class='text-success fw-semibold'>Welcome back, ${resp.first_name}!</span>`);
+            $("#checkinMessage").html("<span class='text-success fw-semibold'>Welcome back, " + resp.first_name + "!</span>");
             $("#form_first").val(resp.first_name);
             $("#form_last").val(resp.last_name);
             $("#form_email").val(resp.email);
             $("#form_phone").val(resp.phone || phone);
           } else {
-            $("#checkinMessage").html("<span class='text-primary'>New volunteer detected. Please complete your application below.</span>");
+            $("#checkinMessage").html("<span class='text-primary'>New volunteer detected. Please check your email to verify, then complete your application.</span>");
             $("#form_first").val(first);
             $("#form_last").val(last);
             $("#form_email").val(email);
             $("#form_phone").val(phone);
           }
 
-          if (resp.activation_message) {
-            $("#checkinMessage").append("<br>" + resp.activation_message);
-            // Keep sections locked until verification
-            lockAllSections();
-          } else {
-            // If for some reason there is no activation message, allow interaction
-            unlockAllSections();
+          // Save latest data and assignments to localStorage for after verification
+          const resolvedFirst = $("#form_first").val().trim();
+          const resolvedLast = $("#form_last").val().trim();
+          const resolvedEmail = $("#form_email").val().trim();
+          const resolvedPhone = $("#form_phone").val().trim();
+          const volunteerData = {
+            email: resolvedEmail,
+            first_name: resolvedFirst,
+            last_name: resolvedLast,
+            phone: resolvedPhone,
+            assignments: resp.assignments || []
+          };
+          try {
+            localStorage.setItem("krasVolunteer", JSON.stringify(volunteerData));
+          } catch (e) {
+            // ignore storage errors
           }
 
-          // If assignments are returned, show them in the grid
+          // If an activation message is returned, keep sections locked and hide assignments until verification
+          if (resp.activation_message) {
+            $("#checkinMessage").append("<br>" + resp.activation_message);
+            lockAllSections();
+            $("#assignmentsContainer").addClass("d-none");
+          } else {
+            // If there is no activation message and already verified, allow sections
+            if (params.get("verified") === "1") {
+              unlockAllSections();
+            }
+          }
+
+          // Assignments: only show after verification AND when assignments exist
           const container = $("#assignmentsContainer");
           const body = $("#assignmentsBody");
           body.empty();
 
-          if (resp.assignments && resp.assignments.length > 0) {
+          if (params.get("verified") === "1" && resp.assignments && resp.assignments.length > 0) {
             resp.assignments.forEach(function(a) {
               const date =
                 a.submitted_at || a.date_submitted || a.created_at || "";
@@ -604,15 +681,14 @@
               const frequency = a.frequency || "";
               const location = a.location || "";
 
-              const row = `
-                <tr>
-                  <td>${date}</td>
-                  <td>${title}</td>
-                  <td>${time}</td>
-                  <td>${duration}</td>
-                  <td>${frequency}</td>
-                  <td>${location}</td>
-                </tr>`;
+              const row = "<tr>" +
+                            "<td>" + date + "</td>" +
+                            "<td>" + title + "</td>" +
+                            "<td>" + time + "</td>" +
+                            "<td>" + duration + "</td>" +
+                            "<td>" + frequency + "</td>" +
+                            "<td>" + location + "</td>" +
+                          "</tr>";
               body.append(row);
             });
             container.removeClass("d-none");
