@@ -14,6 +14,10 @@ app = Flask(__name__, static_folder="static", static_url_path="/static")
 app.secret_key = "supersecretkey"
 serializer = URLSafeTimedSerializer(app.secret_key)
 
+from datetime import timedelta
+app.permanent_session_lifetime = timedelta(minutes=30)
+
+
 
 def require_admin():
     if not session.get("admin_verified"):
@@ -452,6 +456,8 @@ def admin_activate(token):
         return "Invalid or expired admin activation link.", 400
 
     session["admin_verified"] = True
+    session.permanent = True
+
 
     # Return HTML that closes the new tab and refreshes the original tab
     return """
