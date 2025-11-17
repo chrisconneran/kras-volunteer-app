@@ -452,8 +452,23 @@ def admin_activate(token):
         return "Invalid or expired admin activation link.", 400
 
     session["admin_verified"] = True
-    return redirect(url_for("menu", admin_verified=1))
 
+    # Return HTML that closes the new tab and refreshes the original tab
+    return """
+    <html>
+    <body>
+        <p>Admin verified successfully. You may close this window.</p>
+        <script>
+            // Refresh opener tab if it exists
+            if (window.opener) {
+                window.opener.location.reload();
+            }
+            // Close this tab
+            window.close();
+        </script>
+    </body>
+    </html>
+    """
 
 
 
