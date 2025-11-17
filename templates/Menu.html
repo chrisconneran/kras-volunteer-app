@@ -104,17 +104,8 @@
       </div>
     </div>
 
-    <!-- Corrected admin verification listener -->
     <script>
-      window.addEventListener("message", function(event) {
-        if (event.data === "admin_verified") {
-          window.location.href = "/menu?admin_verified=1";
-        }
-      });
-    </script>
-
-    <script>
-      // Lock menu options until admin verification
+      // Locking and unlocking functions
       function lockMenu() {
         document.getElementById("menuOptions").classList.add("locked");
       }
@@ -122,10 +113,9 @@
         document.getElementById("menuOptions").classList.remove("locked");
       }
 
-      // Read "admin_verified" from URL
       const params = new URLSearchParams(window.location.search);
 
-      // If verified, unlock menu + hide login panel
+      // If admin_verified=1 is in the URL, unlock the menu
       if (params.get("admin_verified") === "1") {
         unlockMenu();
         document.getElementById("adminLoginPanel").style.display = "none";

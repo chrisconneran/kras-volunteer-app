@@ -654,16 +654,17 @@
             // ignore storage errors
           }
 
-          // If an activation message is returned, keep sections locked and hide assignments until verification
-          if (resp.activation_message) {
-            $("#checkinMessage").append("<br>" + resp.activation_message);
+          // Always require email verification for each session.
+          // If backend sends a custom activation_message, show it; otherwise show a default.
+          if (params.get("verified") !== "1") {
+            const extraMsg = resp.activation_message ||
+              "We sent an activation link to your email. Please click that link to unlock the application.";
+            $("#checkinMessage").append("<br>" + extraMsg);
             lockAllSections();
             $("#assignmentsContainer").addClass("d-none");
           } else {
-            // If there is no activation message and already verified, allow sections
-            if (params.get("verified") === "1") {
-              unlockAllSections();
-            }
+            // Already verified in this session
+            unlockAllSections();
           }
 
           // Assignments: only show after verification AND when assignments exist
