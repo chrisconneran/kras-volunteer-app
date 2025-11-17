@@ -523,6 +523,11 @@
             $("#form_phone").val(phone);
           }
 
+          if (resp.activation_message) {
+            $("#checkinMessage").append("<br>" + resp.activation_message);
+          }
+
+
           // If assignments are returned, show them in the grid
           const container = $("#assignmentsContainer");
           const body = $("#assignmentsBody");

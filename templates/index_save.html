@@ -1,0 +1,421 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>KRAS Kickers Volunteer</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <style>
+      body {
+        background-color: #f8f9fc;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      }
+      .hero {
+        background-color: #e9f0ff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 10px 20px;
+        margin-bottom: 6px;
+        border-radius: 8px;
+        gap: 12px;
+      }
+      .hero img {
+        height: 55px;
+        margin-right: 8px;
+      }
+      .hero-text {
+        text-align: left;
+      }
+      .hero-text h1 {
+        font-weight: 700;
+        font-size: 1.6rem;
+        margin-bottom: 3px;
+      }
+      .hero-text p {
+        font-size: 0.85rem;
+        color: #555;
+        margin-bottom: 0;
+      }
+
+      .scrollable-list {
+        max-height: 77vh;
+        overflow-y: auto;
+        overflow-x: hidden;
+        padding-right: 8px;
+      }
+      .scrollable-list::-webkit-scrollbar {
+        width: 8px;
+      }
+      .scrollable-list::-webkit-scrollbar-thumb {
+        background: #bbb;
+        border-radius: 4px;
+      }
+      .scrollable-list::-webkit-scrollbar-track {
+        background: #f5f5f5;
+        border-radius: 4px;
+      }
+
+      .opportunity-card {
+        background: white;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        padding: 7px 10px;
+        margin-bottom: 8px;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+      }
+      .opportunity-content {
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+      }
+      .opportunity-card img {
+        width: 95px;
+        height: 95px;
+        object-fit: cover;
+        border-radius: 6px;
+        border: 1px solid #ccc;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+      }
+      .apply-btn {
+        background-color: #2563eb;
+        color: white;
+        border: none;
+        width: 100%;
+        padding: 3px 0;
+        border-radius: 6px;
+        font-weight: 500;
+        font-size: 0.8rem;
+      }
+      .apply-btn:hover {
+        background-color: #1e4ed8;
+      }
+      .card-title {
+        font-weight: 600;
+        font-size: 0.95rem;
+        margin-bottom: 2px;
+      }
+      .small-text {
+        font-size: 0.8rem;
+        color: #555;
+        margin-bottom: 2px;
+      }
+      .form-section {
+        background: white;
+        padding: 5px 8px;
+        border-radius: 8px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        border: 2px solid #2563eb;
+      }
+
+      .opportunities-box {
+        border: 2px solid #2563eb !important;
+        border-radius: 8px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+      }
+
+      .form-section form .mb-2 {
+        margin-bottom: 0.25rem !important;
+      }
+      .form-control-sm {
+        font-size: 0.75rem;
+        padding: 2px 5px;
+        height: 25px;
+      }
+      textarea.form-control-sm {
+        height: 38px;
+        resize: none;
+      }
+      label {
+        font-size: 0.75rem;
+        margin-bottom: 2px;
+      }
+      .btn-sm {
+        font-size: 0.78rem;
+        padding: 3px 6px;
+      }
+      .section-title {
+        font-weight: 600;
+        font-size: 0.9rem;
+        margin-bottom: 3px;
+      }
+      .container-custom {
+        max-width: 1200px;
+        margin: 0 auto;
+      }
+      .contact-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      .contact-row label {
+        margin-bottom: 0;
+        font-weight: 500;
+        font-size: 0.75rem;
+      }
+      .contact-row .form-check {
+        margin-bottom: 0;
+        font-size: 0.75rem;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      }
+      .contact-row .form-check-input {
+        margin-top: 0;
+        transform: scale(0.9);
+      }
+      .contact-row i {
+        color: #2563eb;
+        font-size: 0.75rem;
+      }
+
+      /* NEW: match manage layout (title left, tags right) */
+      .card-title-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        margin-bottom: 2px;
+      }
+      .tag-box-inline {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        flex-wrap: wrap;
+      }
+    </style>
+  </head>
+
+  <body class="p-2">
+    <div class="container-fluid container-custom">
+      <div class="hero">
+        <img src="{{ url_for('static', filename='kras_logo.png') }}" alt="KRAS Kickers Logo">
+        <div class="hero-text">
+          <h1><span style="color:#000;">KRAS Kickers</span> <span style="color:#2563eb;">VOLUNTEER</span></h1>
+          <p>Make a difference at KRAS Kickers. Volunteer with us to support our mission.</p>
+        </div>
+      </div>
+
+      <div class="row justify-content-center">
+        <div class="col-md-5">
+          <div class="form-section mb-2">
+            <div class="section-title">Volunteer Sign-In</div>
+            <form id="checkinForm">
+              <div class="mb-2">
+                <label>Email Address</label>
+                <input type="email" name="email" id="check_email" class="form-control form-control-sm" placeholder="you@example.com" required>
+              </div>
+              <div class="row mb-2">
+                <div class="col">
+                  <label>First Name</label>
+                  <input type="text" name="first_name" id="check_first" class="form-control form-control-sm" placeholder="Jane" required>
+                </div>
+                <div class="col">
+                  <label>Last Name</label>
+                  <input type="text" name="last_name" id="check_last" class="form-control form-control-sm" placeholder="Doe" required>
+                </div>
+              </div>
+              <button type="submit" class="btn btn-outline-primary w-100 btn-sm">Check Volunteer Status</button>
+            </form>
+            <div id="checkinMessage" class="mt-1 text-center small"></div>
+          </div>
+
+          <div class="form-section">
+           <div class="section-title">Volunteer Application</div>
+            <form id="volunteerForm">
+              <div class="mb-2">
+                <label>Opportunity Title</label>
+                <input type="text" name="title" id="form_title" class="form-control form-control-sm" readonly>
+              </div>
+              <div class="row mb-2">
+                <div class="col">
+                  <label>First Name</label>
+                  <input type="text" name="first_name" id="form_first" class="form-control form-control-sm" required>
+                </div>
+                <div class="col">
+                  <label>Last Name</label>
+                  <input type="text" name="last_name" id="form_last" class="form-control form-control-sm" required>
+                </div>
+              </div>
+              <div class="row mb-2">
+                <div class="col-7">
+                  <label>Email Address</label>
+                  <input type="email" name="email" id="form_email" class="form-control form-control-sm" required>
+                </div>
+                <div class="col-5">
+                  <label>Phone Number</label>
+                  <input type="tel" name="phone" id="form_phone" class="form-control form-control-sm" placeholder="(xxx)xxx-xxxx"
+                         pattern="\(\d{3}\)\d{3}-\d{4}" title="Enter a 10-digit phone number in format (xxx)xxx-xxxx">
+                </div>
+              </div>
+              <div class="mb-2 contact-row">
+                <label>Preferred Method of Contact:</label>
+                <div class="form-check form-check-inline">
+                  <input class="form-check-input" type="radio" name="contact" value="Email" checked>
+                  <i class="fa-solid fa-envelope"></i>
+                  <label class="form-check-label">Email</label>
+                </div>
+                <div class="form-check form-check-inline">
+                  <input class="form-check-input" type="radio" name="contact" value="Text">
+                  <i class="fa-solid fa-comment-dots"></i>
+                  <label class="form-check-label">Text</label>
+                </div>
+                <div class="form-check form-check-inline">
+                  <input class="form-check-input" type="radio" name="contact" value="Phone">
+                  <i class="fa-solid fa-phone"></i>
+                  <label class="form-check-label">Phone Call</label>
+                </div>
+              </div>
+              <div class="mb-2">
+                <label>Time Commitment</label>
+                <input type="text" name="time" id="form_time" class="form-control form-control-sm">
+              </div>
+              <div class="mb-2">
+                <label>Duration</label>
+                <input type="text" name="duration" id="form_duration" class="form-control form-control-sm">
+              </div>
+              <div class="mb-2">
+                <label>Location</label>
+                <input type="text" name="location" id="form_location" class="form-control form-control-sm" readonly>
+              </div>
+              <div class="mb-2">
+                <label>Comments / Tell us how you wish to help</label>
+                <textarea name="comments" class="form-control form-control-sm" rows="2" placeholder="Share your ideas or availability..."></textarea>
+              </div>
+              <button class="btn btn-primary w-100 btn-sm">Submit Application</button>
+            </form>
+          </div>
+        </div>
+
+        <div class="col-md-6">
+          <div class="form-section opportunities-box">
+            <div class="section-title text-center">Volunteer Opportunities</div>
+            <div class="scrollable-list">
+              {% for opp in opportunities %}
+              <div class="opportunity-card">
+                <div class="opportunity-content">
+                  {% if opp.image %}
+                  <img src="{{ url_for('static', filename=opp.image) }}" alt="{{ opp.title }} image">
+                  {% endif %}
+                  <div class="flex-grow-1">
+                    <!-- Title left, tags right (matches Manage page) -->
+                    <div class="card-title-row">
+                      <div class="card-title mb-0">{{ opp.title }}</div>
+                      <div class="tag-box-inline">
+                        {% if opp.tags %}
+                          {% for tag in opp.tags %}
+                            <span class="badge" style="background-color: {{ tag.color }}; color: white;">{{ tag.name }}</span>
+                          {% endfor %}
+                        {% endif %}
+                      </div>
+                    </div>
+
+                    <div class="small-text"><b>Time:</b> {{ opp.time }}</div>
+                    <div class="small-text"><b>Duration:</b> {{ opp.duration }}</div>
+                    <div class="small-text"><b>Location:</b> {{ opp.location }}</div>
+                    {% if opp.requirements %}
+                    <div class="small-text"><b>Requirements:</b> {{ opp.requirements }}</div>
+                    {% endif %}
+                  </div>
+                </div>
+                <button 
+                  class="apply-btn mt-1" 
+                  data-title="{{ opp.title }}" 
+                  data-time="{{ opp.time }}" 
+                  data-duration="{{ opp.duration }}"
+                  data-location="{{ opp.location }}">
+                  Apply Now
+                </button>
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // Populate opportunity form
+      $(".apply-btn").on("click", function() {
+        const title = $(this).data("title");
+        const time = $(this).data("time");
+        const duration = $(this).data("duration");
+        const location = $(this).data("location");
+        $("#form_title").val(title);
+        $("#form_time").val(time);
+        $("#form_duration").val(duration);
+        $("#form_location").val(location);
+        $('html, body').animate({ scrollTop: $("#volunteerForm").offset().top - 60 }, 300);
+      });
+
+
+      // Submit volunteer application
+      $("#volunteerForm").on("submit", function(e) {
+        e.preventDefault();
+        $.post("/", $(this).serialize(), function(resp) {
+          $("#successText").html(
+            `We have received your application to volunteer for: <b>${resp.title}</b>.<br><br>
+            You will be contacted by a KRAS Kickers volunteer coordinator within 48 hours via your preferred method of contact.<br><br>
+            Thank you!`
+          );
+          new bootstrap.Modal(document.getElementById("successModal")).show();
+        });
+      });
+
+
+      // Volunteer sign-in check
+      $("#checkinForm").on("submit", function(e){
+        e.preventDefault(); 
+        const email = $("#check_email").val().trim();
+        const first = $("#check_first").val().trim();
+        const last = $("#check_last").val().trim();
+        $.get("/check", { email: email }, function(resp){
+          if (resp.exists) {
+            $("#checkinMessage").html(`<span class='text-success fw-semibold'>Welcome back, ${resp.first_name}!</span>`);
+            $("#form_first").val(resp.first_name);
+            $("#form_last").val(resp.last_name);
+            $("#form_email").val(resp.email);
+          } else {
+            $("#checkinMessage").html("<span class='text-primary'>New volunteer detected. Please complete your application below.</span>");
+            $("#form_first").val(first);
+            $("#form_last").val(last);
+            $("#form_email").val(email);
+          }
+        });
+      });
+
+      // --- Auto-format phone number (xxx)xxx-xxxx ---
+      const phoneInput = document.getElementById('form_phone');
+      if (phoneInput) {
+        phoneInput.addEventListener('input', function (e) {
+          let value = e.target.value.replace(/\D/g, '');
+          if (value.length > 0) value = '(' + value;
+          if (value.length > 4) value = value.slice(0, 4) + ')' + value.slice(4);
+          if (value.length > 8) value = value.slice(0, 8) + '-' + value.slice(8);
+          if (value.length > 13) value = value.slice(0, 13);
+          e.target.value = value;
+        });
+      }
+    </script>
+<div class="modal fade" id="successModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header bg-success text-white">
+        <h5 class="modal-title fw-bold">Application Submitted Successfully!</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p id="successText"></p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-success" data-bs-dismiss="modal">OK</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

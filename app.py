@@ -1,12 +1,19 @@
-from flask import Flask, render_template, request, jsonify, redirect, url_for
+from flask import Flask, render_template, request, jsonify, redirect, url_for, session
 from datetime import datetime
 import os
 import json
 import sqlite3
 from werkzeug.utils import secure_filename
 
+from itsdangerous import URLSafeTimedSerializer
+import smtplib
+from email.message import EmailMessage
+
+
 app = Flask(__name__, static_folder="static", static_url_path="/static")
 app.secret_key = "supersecretkey"
+serializer = URLSafeTimedSerializer(app.secret_key)
+
 
 # --- SQLite setup ---
 DB_FILE = "volunteers.db"
@@ -35,6 +42,13 @@ def dictify_rows(rows):
 
 # --- Shared POST handler for volunteer application submissions ---
 def _handle_application_post():
+    if not session.get("email_verified"):
+        return jsonify(
+            {
+                "error": "Email not verified. Please check your email for the activation link."
+            }
+        ), 403
+
     form_data = request.form.to_dict()
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
 
@@ -81,6 +95,66 @@ def _handle_application_post():
             "title": form_data.get("title", "Volunteer Opportunity"),
         }
     )
+
+
+# -----------------------------------
+# Email + Token Helper Functions
+# -----------------------------------
+
+def generate_activation_token(email: str) -> str:
+    return serializer.dumps(email, salt="email-activate")
+
+
+def confirm_activation_token(token: str, max_age: int = 3600) -> str | None:
+    try:
+        email = serializer.loads(token, salt="email-activate", max_age=max_age)
+    except Exception:
+        return None
+    return email
+
+
+def send_activation_email(recipient_email: str) -> None:
+    token = generate_activation_token(recipient_email)
+    activation_link = url_for("activate_email", token=token, _external=True)
+
+    subject = "KRAS Kickers volunteer email verification"
+    body = f"""Thank you for your interest in volunteering with KRAS Kickers.
+
+To continue with your volunteer application, confirm your email by clicking this link:
+
+{activation_link}
+
+If you did not request this, you can ignore this message.
+"""
+
+    msg = EmailMessage()
+    msg["Subject"] = subject
+    msg["From"] = os.environ.get("SMTP_FROM", "no-reply@kraskickers.org")
+    msg["To"] = recipient_email
+    msg.set_content(body)
+
+    smtp_host = os.environ.get("SMTP_HOST", "localhost")
+    smtp_port = int(os.environ.get("SMTP_PORT", "25"))
+    smtp_user = os.environ.get("SMTP_USER")
+    smtp_password = os.environ.get("SMTP_PASSWORD")
+
+    with smtplib.SMTP(smtp_host, smtp_port) as server:
+        if smtp_user and smtp_password:
+            server.starttls()
+            server.login(smtp_user, smtp_password)
+        server.send_message(msg)
+
+
+@app.route("/activate/<token>")
+def activate_email(token):
+    email = confirm_activation_token(token)
+    if not email:
+        return "Activation link is invalid or expired", 400
+
+    session["email_verified"] = True
+    session["verified_email"] = email
+    return redirect(url_for("index"))
+
 
 
 # --- HOME PAGE (Volunteer Opportunities + Application Form) ---
@@ -346,19 +420,32 @@ def view_applicants(opp_id):
 def check_volunteer():
     """
     Check whether a volunteer already exists (by email) and,
-    if so, return their latest info plus any current ASSIGNED
-    opportunities as "assignments".
+    in all cases, send an activation email so they can verify
+    their address before submitting the application.
     """
 
     email = request.args.get("email", "").strip().lower()
     if not email:
         return jsonify({"exists": False}), 200
 
+    # Reset verification state whenever a new email is checked
+    session["email_verified"] = False
+    session["verified_email"] = None
+
+    activation_message = ""
+    try:
+        send_activation_email(email)
+        activation_message = (
+            "We sent an activation link to your email. "
+            "Click that link to unlock the application form."
+        )
+    except Exception as exc:
+        activation_message = f"Could not send activation email: {exc}"
+
     conn = sqlite3.connect("volunteers.db")
     conn.row_factory = sqlite3.Row
 
     try:
-        # 1) Look up the most recent application for this email
         person_row = conn.execute(
             """
             SELECT
@@ -376,10 +463,13 @@ def check_volunteer():
 
         if not person_row:
             # New volunteer
-            return jsonify({"exists": False}), 200
+            return jsonify(
+                {
+                    "exists": False,
+                    "activation_message": activation_message,
+                }
+            ), 200
 
-        # 2) Get current ASSIGNED opportunities for this volunteer,
-        #    joining to opportunities to get time/duration/frequency/location
         assignment_rows = conn.execute(
             """
             SELECT
@@ -419,11 +509,13 @@ def check_volunteer():
             "email": person_row["email"],
             "phone": person_row["phone"],
             "assignments": assignments,
+            "activation_message": activation_message,
         }
         return jsonify(resp), 200
 
     finally:
         conn.close()
+
 
 
 # --- Review and Assignments ---
