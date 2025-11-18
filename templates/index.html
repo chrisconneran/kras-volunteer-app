@@ -623,6 +623,13 @@
         const phone = $("#check_phone").val().trim();
 
         $.get("/check", { email: email }, function(resp){
+
+          // NEW — required so verified session loads in SAME tab
+          if (resp.redirect) {
+            window.location = resp.redirect;
+            return;
+          }
+
           // Fill sign-in message and pre-fill application form
           if (resp.exists) {
             $("#checkinMessage").html("<span class='text-success fw-semibold'>Welcome back, " + resp.first_name + "!</span>");
@@ -674,6 +681,9 @@
             // Keep Step 3 email locked to the verified address
             $("#form_email").prop("readonly", true);
           }
+        });
+      });
+
 
 
           // Assignments: only show after verification AND when assignments exist
