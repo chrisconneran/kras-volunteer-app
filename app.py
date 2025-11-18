@@ -353,12 +353,14 @@ def index():
 
         app_id = save_application(request.form.to_dict())
         return jsonify(
-            {
-                "status": "success",
-                "message": "Thank you! Your volunteer application has been submitted.",
-                "application_id": app_id,
-            }
-        )
+    {
+        "status": "success",
+        "title": request.form.get("title"),
+        "message": "Thank you! Your volunteer application has been submitted.",
+        "application_id": app_id,
+    }
+)
+
 
     conn = get_db_connection()
     rows = conn.execute(
