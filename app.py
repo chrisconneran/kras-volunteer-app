@@ -298,17 +298,13 @@ def activate_email(token):
     session["email_verified"] = True
     session["verified_email"] = email
 
-    return redirect("https://kras-volunteer-app.onrender.com/?verified=1")
+    return redirect(url_for("index", verified=1))
 
 
 
-
-
-
-# --- HOME PAGE (Volunteer Opportunities + Application Form) ---
+# --- HOME PAGE ---
 @app.route("/", methods=["GET", "POST"])
 def index():
-    # NEW: force re-verification on every fresh visit (no ?verified=1)
     if request.method == "POST":
         form_email = request.form.get("email", "").strip().lower()
         verified_email = session.get("verified_email", "").strip().lower()
@@ -462,7 +458,6 @@ def admin_activate(token):
     session["admin_verified"] = True
     session.permanent = True
 
-    # UPDATED: make opener load /menu?admin_verified=1 so JS can unlock menu
     return """
     <html>
     <body>
@@ -642,7 +637,7 @@ def closed_opportunities():
     )
 
 
-# --- View Applicants for a Specific Opportunity ---
+# --- View Applicants ---
 @app.route("/applicants/<int:opp_id>")
 def view_applicants(opp_id):
     auth = require_admin()
@@ -701,7 +696,7 @@ def view_applicants(opp_id):
     )
 
 
-# --- Check Visitor Volunteer Status ---
+# --- Check Volunteer Status ---
 @app.route("/check")
 def check_volunteer():
     email = request.args.get("email", "").strip().lower()
@@ -791,7 +786,7 @@ def check_volunteer():
     return jsonify(response)
 
 
-# --- Review and Assignments ---
+# --- Review ---
 @app.route("/review")
 def review():
     auth = require_admin()
