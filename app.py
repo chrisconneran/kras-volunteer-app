@@ -308,11 +308,6 @@ def activate_email(token):
 @app.route("/", methods=["GET", "POST"])
 def index():
     # NEW: force re-verification on every fresh visit (no ?verified=1)
-    verified_flag = request.args.get("verified")
-    if request.method == "GET" and verified_flag != "1":
-        session.pop("email_verified", None)
-        session.pop("verified_email", None)
-
     if request.method == "POST":
         form_email = request.form.get("email", "").strip().lower()
         verified_email = session.get("verified_email", "").strip().lower()

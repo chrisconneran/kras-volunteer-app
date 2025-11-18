@@ -518,47 +518,47 @@
           $("#check_email").val(storedVolunteer.email);
         }
 
-        if (verifiedEmail) {
-          $.get("/check", { email: verifiedEmail }, function(resp) {
+          if (verifiedEmail) {
+            $.get("/check", { email: verifiedEmail }, function(resp) {
 
-            storedVolunteer = resp;
+              storedVolunteer = resp;
 
-            // Step 1 identity fields (make read-only)
-            $("#check_email").val(resp.email || "").prop("readonly", true);
-            $("#check_first").val(resp.first_name || "").prop("readonly", true);
-            $("#check_last").val(resp.last_name || "").prop("readonly", true);
-            $("#check_phone").val(resp.phone || "").prop("readonly", true);
+              // Step 1 identity fields (make read-only)
+              $("#check_email").val(resp.email || "").prop("readonly", true);
+              $("#check_first").val(resp.first_name || "").prop("readonly", true);
+              $("#check_last").val(resp.last_name || "").prop("readonly", true);
+              $("#check_phone").val(resp.phone || "").prop("readonly", true);
 
-            // Step 3 fields
-            $("#form_first").val(resp.first_name || "");
-            $("#form_last").val(resp.last_name || "");
-            $("#form_email").val(resp.email || "").prop("readonly", true);
-            $("#form_phone").val(resp.phone || "");
+              // Step 3 fields
+              $("#form_first").val(resp.first_name || "");
+              $("#form_last").val(resp.last_name || "");
+              $("#form_email").val(resp.email || "").prop("readonly", true);
+              $("#form_phone").val(resp.phone || "");
 
-            // Assignments table
-            const container = $("#assignmentsContainer");
-            const body = $("#assignmentsBody");
-            body.empty();
+              // Assignments table
+              const container = $("#assignmentsContainer");
+              const body = $("#assignmentsBody");
+              body.empty();
 
-            if (resp.assignments && resp.assignments.length > 0) {
-              resp.assignments.forEach(function(a) {
-                const row = "<tr>" +
-                              "<td>" + (a.submitted_at || "") + "</td>" +
-                              "<td>" + (a.title || "") + "</td>" +
-                              "<td>" + (a.time_commitment || "") + "</td>" +
-                              "<td>" + (a.duration || "") + "</td>" +
-                              "<td>" + (a.frequency || "") + "</td>" +
-                              "<td>" + (a.location || "") + "</td>" +
-                            "</tr>";
-                body.append(row);
-              });
-              container.removeClass("d-none");
-            } else {
-              container.addClass("d-none");
-            }
-          });
+              if (resp.assignments && resp.assignments.length > 0) {
+                resp.assignments.forEach(function(a) {
+                  const row = "<tr>" +
+                                "<td>" + (a.submitted_at || "") + "</td>" +
+                                "<td>" + (a.title || "") + "</td>" +
+                                "<td>" + (a.time_commitment || "") + "</td>" +
+                                "<td>" + (a.duration || "") + "</td>" +
+                                "<td>" + (a.frequency || "") + "</td>" +
+                                "<td>" + (a.location || "") + "</td>" +
+                              "</tr>";
+                  body.append(row);
+                });
+                container.removeClass("d-none");
+              } else {
+                container.addClass("d-none");
+              }
+            });
+          }
         }
-      }
      
       // Populate opportunity form when "Apply Now" is clicked
       $(".apply-btn").on("click", function() {
@@ -648,25 +648,32 @@
             // ignore storage errors
           }
 
-          // Always require email verification for each session.
-          // If backend sends a custom activation_message, show it; otherwise show a default.
-          if (params.get("verified") !== "1") {
-            const extraMsg = resp.activation_message ||
-              "We sent an activation link to your email. Please click that link to unlock the application.";
-            $("#checkinMessage").append("<br>" + extraMsg);
+          // Decide lock/unlock based on whether the backend still wants activation
+          if (resp.activation_message) {
+            $("#checkinMessage").append("<br>" + resp.activation_message);
             lockAllSections();
             $("#assignmentsContainer").addClass("d-none");
           } else {
-            // Already verified in this session
+            // Email is verified for this session
             unlockAllSections();
+
+            // Make Step 1 identity fields read-only
+            $("#check_email").prop("readonly", true);
+            $("#check_first").prop("readonly", true);
+            $("#check_last").prop("readonly", true);
+            $("#check_phone").prop("readonly", true);
+
+            // Keep Step 3 email locked to the verified address
+            $("#form_email").prop("readonly", true);
           }
+
 
           // Assignments: only show after verification AND when assignments exist
           const container = $("#assignmentsContainer");
           const body = $("#assignmentsBody");
           body.empty();
 
-          if (params.get("verified") === "1" && resp.assignments && resp.assignments.length > 0) {
+          if (!resp.activation_message && resp.assignments && resp.assignments.length > 0) {
             resp.assignments.forEach(function(a) {
               const date =
                 a.submitted_at || a.date_submitted || a.created_at || "";
