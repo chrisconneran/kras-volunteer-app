@@ -99,7 +99,7 @@ def seed_opportunities():
     conn.close()
 
 
-create_tables()
+
 seed_opportunities()
 
 
