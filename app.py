@@ -230,7 +230,8 @@ def send_activation_email(recipient_email: str) -> None:
     activation_link = url_for("activate_email", token=token, _external=True)
 
     subject = "KRAS Kickers volunteer email verification"
-    body = f"""Thank you for your interest in volunteering with KRAS Kickers.
+
+    text_body = f"""Thank you for your interest in volunteering with KRAS Kickers.
 
 To continue with your volunteer application, confirm your email by clicking this link:
 
@@ -239,11 +240,24 @@ To continue with your volunteer application, confirm your email by clicking this
 If you did not request this, you can ignore this message.
 """
 
+    html_body = f"""
+    <html>
+      <body>
+        <p>Thank you for your interest in volunteering with KRAS Kickers.</p>
+        <p>To continue with your volunteer application, confirm your email by clicking the link below:</p>
+        <p><a href="{activation_link}" target="_self">Click here to verify your email</a></p>
+        <p>If you did not request this, you can ignore this message.</p>
+      </body>
+    </html>
+    """
+
     msg = EmailMessage()
     msg["Subject"] = subject
     msg["From"] = os.environ.get("SMTP_FROM", "no-reply@kraskickers.org")
     msg["To"] = recipient_email
-    msg.set_content(body)
+
+    msg.set_content(text_body)
+    msg.add_alternative(html_body, subtype="html")
 
     smtp_host = os.environ.get("SMTP_HOST", "localhost")
     smtp_port = int(os.environ.get("SMTP_PORT", "25"))
@@ -255,6 +269,12 @@ If you did not request this, you can ignore this message.
             server.starttls()
             server.login(smtp_user, smtp_password)
         server.send_message(msg)
+
+@app.route("/logout")
+def logout():
+    session.pop("email_verified", None)
+    session.pop("verified_email", None)
+    return redirect(url_for("index"))
 
 
 def send_admin_activation_email(recipient_email: str) -> None:
