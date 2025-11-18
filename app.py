@@ -1,120 +1,196 @@
 from flask import Flask, render_template, request, jsonify, redirect, url_for, session
-from datetime import datetime
+from datetime import datetime, timedelta
 import os
 import json
-import sqlite3
-from werkzeug.utils import secure_filename
-
-from itsdangerous import URLSafeTimedSerializer
 import smtplib
 from email.message import EmailMessage
 
+import psycopg
+from psycopg.rows import dict_row
+from itsdangerous import URLSafeTimedSerializer
+from werkzeug.utils import secure_filename
 
+
+# =====
+# Flask app setup
+# =====
 app = Flask(__name__, static_folder="static", static_url_path="/static")
 app.secret_key = "supersecretkey"
 serializer = URLSafeTimedSerializer(app.secret_key)
-# Ensure uploads folder works on Render
-app.config["UPLOAD_FOLDER"] = "static"
 
-# Create the folder if it doesn't exist
+# Sessions expire after 30 minutes of inactivity
+app.permanent_session_lifetime = timedelta(minutes=30)
+
+# Static uploads
+app.config["UPLOAD_FOLDER"] = "static"
 os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
 
 
-from datetime import timedelta
-app.permanent_session_lifetime = timedelta(minutes=30)
-
-
-
-def require_admin():
-    if not session.get("admin_verified"):
-        return redirect(url_for("menu"))
-
-
-import os
-import psycopg
-
+# =====
+# Database helpers (Postgres via psycopg)
+# =====
 DATABASE_URL = os.getenv("DATABASE_URL")
 
+
 def get_db_connection():
-    conn = psycopg.connect(DATABASE_URL)
+    """
+    Open a new Postgres connection with rows returned as dicts.
+    """
+    if not DATABASE_URL:
+        raise RuntimeError("DATABASE_URL environment variable is not set.")
+    conn = psycopg.connect(DATABASE_URL, row_factory=dict_row)
     return conn
 
 
-
-
-def seed_opportunities():
-    conn = get_db_connection()
-    cur = conn.cursor()
-
-    cur.execute("SELECT COUNT(*) FROM opportunities")
-    result = cur.fetchone()
-    count = result[0] if result else 0
-
-    if count == 0:
-        sample_data = [
-            (
-                "Social Media Ambassador",
-                "2-3 hrs/week",
-                "3 months",
-                "Remote",
-                "Help spread awareness about KRAS-targeted lung cancer via social media campaigns.",
-                "Basic social media skills. Training on key messages provided.",
-                "Remote",
-                "social_media.png",
-                json.dumps(["Awareness", "Remote", "Flexible"]),
-            ),
-            (
-                "Clinical Trial Navigator",
-                "4-5 hrs/week",
-                "6 months",
-                "Hybrid",
-                "Assist patients and families in understanding and navigating KRAS clinical trial options.",
-                "Background in healthcare or patient support preferred. Training provided.",
-                "Hybrid: Online and occasional in-person meetings.",
-                "clinical_navigator.png",
-                json.dumps(["Clinical", "Patient Support", "Hybrid"]),
-            ),
-            (
-                "Event Volunteer",
-                "4-6 hrs/event",
-                "Per event",
-                "In-Person",
-                "Support KRAS Kickers awareness events with setup, check-in, and engagement.",
-                "Comfortable around crowds and public-facing roles.",
-                "Various event locations nationwide.",
-                "event_volunteer.png",
-                json.dumps(["Events", "In-Person"]),
-            ),
-        ]
-
-        for title, time_txt, duration, mode, desc, reqs, location, image, tags in sample_data:
-            cur.execute(
-                """
-                INSERT INTO opportunities
-                (title, time, duration, mode, description, requirements, location, image, tags, closed)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, FALSE)
-                """,
-                (title, time_txt, duration, mode, desc, reqs, location, image, tags),
-            )
-
-        conn.commit()
-
-    conn.close()
-
-
-seed_opportunities()
-
-
 def dictify_rows(rows):
+    """
+    Convert a sequence of row objects into a list of plain dictionaries.
+    With dict_row this is mostly a no-op, but it keeps old code working.
+    """
     result = []
     for r in rows:
-        d = {}
-        for k in r.keys():
-            d[k] = r[k]
-        result.append(d)
+        if isinstance(r, dict):
+            result.append(dict(r))
+        else:
+            d = {}
+            for k in r.keys():
+                d[k] = r[k]
+            result.append(d)
     return result
 
 
+def require_admin():
+    """
+    Simple guard used at the top of admin-only routes.
+    If admin is not verified, redirect to the menu.
+    """
+    if not session.get("admin_verified"):
+        return redirect(url_for("menu"))
+    return None
+
+
+# =====
+# Seed default opportunities IF the table is empty
+# =====
+def seed_opportunities():
+    """
+    Insert three sample opportunities only if the opportunities table
+    contains zero rows. This is safe for Postgres and will not run
+    on every request because it is called once on import.
+    """
+    try:
+        conn = get_db_connection()
+    except RuntimeError:
+        # In case DATABASE_URL is not set during local tooling
+        return
+
+    with conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT COUNT(*) AS cnt FROM opportunities")
+            row = cur.fetchone()
+            count = row["cnt"] if row and "cnt" in row else (row[0] if row else 0)
+
+            if count and count > 0:
+                return
+
+            sample_data = [
+                (
+                    "Social Media Ambassador",
+                    "1-2 hours",
+                    "3 months",
+                    "Remote - Weekly",
+                    "Help spread awareness about KRAS-targeted lung cancer via social media campaigns.",
+                    "Basic social media skills. Training on key messages provided.",
+                    "Remote",
+                    "social_media.png",
+                    json.dumps(
+                        [
+                            {"name": "Awareness", "color": "#2563eb"},
+                            {"name": "Remote", "color": "#16a34a"},
+                            {"name": "Flexible", "color": "#6b7280"},
+                        ]
+                    ),
+                ),
+                (
+                    "Clinical Trial Navigator",
+                    "2-4 hours",
+                    "6 months",
+                    "Remote - Monthly",
+                    "Assist patients and families in understanding and navigating KRAS clinical trial options.",
+                    "Background in healthcare or patient support preferred. Training provided.",
+                    "Hybrid: Online and occasional in-person meetings.",
+                    "clinical_navigator.png",
+                    json.dumps(
+                        [
+                            {"name": "Clinical", "color": "#9333ea"},
+                            {"name": "Patient Support", "color": "#16a34a"},
+                            {"name": "Hybrid", "color": "#2563eb"},
+                        ]
+                    ),
+                ),
+                (
+                    "Event Volunteer",
+                    "4-8 hours",
+                    "Per event",
+                    "In-Person - At Event",
+                    "Support KRAS Kickers awareness events with setup, check-in, and engagement.",
+                    "Comfortable around crowds and public-facing roles.",
+                    "Various event locations nationwide.",
+                    "event_volunteer.png",
+                    json.dumps(
+                        [
+                            {"name": "Events", "color": "#facc15"},
+                            {"name": "In-Person", "color": "#dc2626"},
+                        ]
+                    ),
+                ),
+            ]
+
+            for (
+                title,
+                time_txt,
+                duration,
+                mode,
+                desc,
+                reqs,
+                location,
+                image,
+                tags_json,
+            ) in sample_data:
+                cur.execute(
+                    """
+                    INSERT INTO opportunities
+                        (title, time, duration, mode, description,
+                         requirements, location, image, tags, closed)
+                    VALUES
+                        (%s,   %s,   %s,       %s,   %s,
+                         %s,           %s,       %s,    %s,   FALSE)
+                    """,
+                    (
+                        title,
+                        time_txt,
+                        duration,
+                        mode,
+                        desc,
+                        reqs,
+                        location,
+                        image,
+                        tags_json,
+                    ),
+                )
+
+
+# Call once at import time; if table already has data, it does nothing
+try:
+    seed_opportunities()
+except Exception:
+    # If something goes wrong here, the rest of the app should still run
+    pass
+
+
+# =====
+# File upload helpers
+# =====
 ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "gif"}
 
 
@@ -127,52 +203,9 @@ def allowed_file(filename: str) -> bool:
     return ext in ALLOWED_EXTENSIONS
 
 
-def save_application(form_data: dict) -> int:
-    history_list = [
-        {
-            "event": "Application submitted",
-            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
-        }
-    ]
-    notes_list = []
-
-    conn = get_db_connection()
-    cur = conn.cursor()
-    cur.execute(
-        """
-        INSERT INTO applications
-        (first_name, last_name, email, phone, contact, title, time, duration, mode, location, comments, status, timestamp, history, notes)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-        (
-            form_data.get("first_name"),
-            form_data.get("last_name"),
-            form_data.get("email"),
-            form_data.get("phone"),
-            form_data.get("contact"),
-            form_data.get("title"),
-            form_data.get("time"),
-            form_data.get("duration"),
-            form_data.get("mode"),
-            form_data.get("location"),
-            form_data.get("comments"),
-            "Pending",
-            datetime.now().strftime("%Y-%m-%d %H:%M"),
-            json.dumps(history_list),
-            json.dumps(notes_list),
-        ),
-    )
-    conn.commit()
-    app_id = cur.lastrowid
-    conn.close()
-    return app_id
-
-
-# -----------------------------------
-# Email + Token Helper Functions
-# -----------------------------------
-
-
+# =====
+# Email + token helpers
+# =====
 def generate_activation_token(email: str) -> str:
     return serializer.dumps(email, salt="email-activate")
 
@@ -230,12 +263,6 @@ If you did not request this, you can ignore this message.
             server.login(smtp_user, smtp_password)
         server.send_message(msg)
 
-@app.route("/logout")
-def logout():
-    session.pop("email_verified", None)
-    session.pop("verified_email", None)
-    return redirect(url_for("index"))
-
 
 def send_admin_activation_email(recipient_email: str) -> None:
     token = generate_activation_token(recipient_email)
@@ -269,6 +296,67 @@ If you did not request this, you can ignore this message.
         server.send_message(msg)
 
 
+# =====
+# Core data helpers
+# =====
+def save_application(form_data: dict) -> int:
+    """
+    Insert a new volunteer application into Postgres.
+    History and notes are stored as JSON text.
+    """
+    history_list = [
+        {
+            "event": "Application submitted",
+            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
+        }
+    ]
+    notes_list = []
+
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO applications
+                    (first_name, last_name, email, phone, contact,
+                     title, time, duration, mode, location,
+                     comments, status, timestamp, history, notes)
+                VALUES
+                    (%s, %s, %s, %s, %s,
+                     %s,   %s,   %s,      %s,   %s,
+                     %s,      %s,      %s,        %s,      %s)
+                RETURNING id
+                """,
+                (
+                    form_data.get("first_name"),
+                    form_data.get("last_name"),
+                    form_data.get("email"),
+                    form_data.get("phone"),
+                    form_data.get("contact"),
+                    form_data.get("title"),
+                    form_data.get("time"),
+                    form_data.get("duration"),
+                    form_data.get("mode"),
+                    form_data.get("location"),
+                    form_data.get("comments"),
+                    "Pending",
+                    datetime.now().strftime("%Y-%m-%d %H:%M"),
+                    json.dumps(history_list),
+                    json.dumps(notes_list),
+                ),
+            )
+            row = cur.fetchone()
+            app_id = row["id"] if isinstance(row, dict) else row[0]
+            return int(app_id)
+# =====
+# Routes
+# =====
+@app.route("/logout")
+def logout():
+    session.pop("email_verified", None)
+    session.pop("verified_email", None)
+    return redirect(url_for("index"))
+
+
 @app.route("/activate/<token>")
 def activate_email(token):
     email = confirm_activation_token(token)
@@ -277,17 +365,45 @@ def activate_email(token):
 
     session["email_verified"] = True
     session["verified_email"] = email
+    session.permanent = True
 
-    # Redirect user directly to main page like Google/Amazon
     return redirect(url_for("index", verified=1))
 
 
-# --- HOME PAGE ---
+@app.route("/admin_request_access", methods=["POST"])
+def admin_request_access():
+    data = request.get_json()
+    email = (data.get("email") or "").strip().lower()
+
+    if not email.endswith("@kraskickers.org"):
+        return {"error": "Admin access requires a @kraskickers.org email address."}, 400
+
+    send_admin_activation_email(email)
+    return {
+        "message": "A verification link has been sent to your KRAS Kickers email."
+    }
+
+
+@app.route("/admin_activate/<token>")
+def admin_activate(token):
+    email = confirm_activation_token(token, max_age=3600)
+    if not email or not email.endswith("@kraskickers.org"):
+        return "Invalid or expired admin activation link.", 400
+
+    session["admin_verified"] = True
+    session.permanent = True
+
+    return redirect(url_for("menu", admin_verified=1))
+
+
+# =====
+# Home page
+# =====
 @app.route("/", methods=["GET", "POST"])
 def index():
     if request.method == "POST":
-        form_email = request.form.get("email", "").strip().lower()
-        verified_email = session.get("verified_email", "").strip().lower()
+        form_email = (request.form.get("email") or "").strip().lower()
+        verified_email = (session.get("verified_email") or "").strip().lower()
 
         if not session.get("email_verified"):
             return (
@@ -313,20 +429,21 @@ def index():
 
         app_id = save_application(request.form.to_dict())
         return jsonify(
-    {
-        "status": "success",
-        "title": request.form.get("title"),
-        "message": "Thank you! Your volunteer application has been submitted.",
-        "application_id": app_id,
-    }
-)
+            {
+                "status": "success",
+                "title": request.form.get("title"),
+                "message": "Thank you. Your volunteer application has been submitted.",
+                "application_id": app_id,
+            }
+        )
 
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT * FROM opportunities WHERE closed IS FALSE OR closed IS NULL"
+            )
+            rows = cur.fetchall()
 
-    conn = get_db_connection()
-    rows = conn.execute(
-        "SELECT * FROM opportunities WHERE closed = 0 OR closed IS NULL"
-    ).fetchall()
-    conn.close()
     opportunities = dictify_rows(rows)
 
     for opp in opportunities:
@@ -338,24 +455,39 @@ def index():
                 opp["tags"] = []
         elif tags_raw is None:
             opp["tags"] = []
+
+        if "description" in opp and "desc" not in opp:
+            opp["desc"] = opp["description"]
+
         opp["frequency"] = opp.get("mode", "")
 
     return render_template("index.html", opportunities=opportunities)
 
 
+# =====
+# Admin menu
+# =====
+@app.route("/menu")
+def menu():
+    return render_template("Menu.html")
 
-# --- Manage Active Opportunities ---
+
+# =====
+# Manage active opportunities
+# =====
 @app.route("/manage", methods=["GET"])
 def manage():
     auth = require_admin()
     if auth:
         return auth
 
-    conn = get_db_connection()
-    rows = conn.execute(
-        "SELECT * FROM opportunities WHERE closed = 0 OR closed IS NULL"
-    ).fetchall()
-    conn.close()
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT * FROM opportunities WHERE closed IS FALSE OR closed IS NULL"
+            )
+            rows = cur.fetchall()
+
     opportunities = dictify_rows(rows)
 
     for opp in opportunities:
@@ -367,59 +499,100 @@ def manage():
                 opp["tags"] = []
         elif tags_raw is None:
             opp["tags"] = []
+
+        if "description" in opp and "desc" not in opp:
+            opp["desc"] = opp["description"]
+
         opp["frequency"] = opp.get("mode", "")
 
     return render_template("manage.html", opportunities=opportunities)
 
+
+# =====
+# Champion APIs
+# =====
 @app.route("/api/champions")
 def get_champions():
-    conn = get_db_connection()
-    champions = conn.execute(
-        "SELECT id, first_name, last_name, email FROM applications WHERE is_champion = 1 ORDER BY first_name"
-    ).fetchall()
-    conn.close()
-    return jsonify([dict(row) for row in champions])
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT id, first_name, last_name, email
+                FROM applications
+                WHERE is_champion IS TRUE
+                ORDER BY first_name, last_name
+                """
+            )
+            rows = cur.fetchall()
 
-@app.route("/assign_champion", methods=["POST"])
+    champions = dictify_rows(rows)
+    return jsonify(champions)
+
+
+@app.route("/api/opportunity_champions/<int:opp_id>")
+def get_opportunity_champions(opp_id):
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT
+                    a.id,
+                    a.first_name,
+                    a.last_name,
+                    a.email
+                FROM champions_opportunities co
+                JOIN applications a ON co.champion_id = a.id
+                WHERE co.opportunity_id = %s
+                ORDER BY a.first_name, a.last_name
+                """,
+                (opp_id,),
+            )
+            rows = cur.fetchall()
+
+    champions = dictify_rows(rows)
+    return jsonify(champions)
+
+
+@app.route("/api/assign_champion", methods=["POST"])
 def assign_champion():
     if not session.get("admin_verified"):
         return jsonify({"error": "Not authorized"}), 403
 
-    data = request.json
-    champion_id = data.get("champion_id")
-    opportunity_id = data.get("opportunity_id")
+    champion_id = request.form.get("champion_id")
+    opportunity_id = request.form.get("opportunity_id")
 
     if not champion_id or not opportunity_id:
         return jsonify({"error": "Missing data"}), 400
 
-    conn = get_db_connection()
-    conn.execute(
-        "INSERT INTO champions_opportunities (champion_id, opportunity_id) VALUES (?, ?)",
-        (champion_id, opportunity_id)
-    )
-    conn.commit()
-    conn.close()
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT id
+                FROM champions_opportunities
+                WHERE champion_id = %s AND opportunity_id = %s
+                """,
+                (champion_id, opportunity_id),
+            )
+            existing = cur.fetchone()
 
-    return jsonify({"message": "Champion assigned successfully"})
+            if existing:
+                return jsonify({"message": "Champion already assigned."})
 
-@app.route("/api/opportunity_champions/<int:opp_id>")
-def get_opportunity_champions(opp_id):
-    conn = get_db_connection()
-    rows = conn.execute(
-        """
-        SELECT c.id, a.first_name, a.last_name, a.email
-        FROM champions_opportunities c
-        JOIN applications a ON c.champion_id = a.id
-        WHERE c.opportunity_id = ?
-        """,
-        (opp_id,)
-    ).fetchall()
-    conn.close()
-    return jsonify([dict(row) for row in rows])
+            cur.execute(
+                """
+                INSERT INTO champions_opportunities (champion_id, opportunity_id)
+                VALUES (%s, %s)
+                """,
+                (champion_id, opportunity_id),
+            )
+
+    return jsonify({"message": "Champion assigned successfully."})
 
 
-
-# --- Add Opportunity ---
+# =====
+# Add opportunity
+# =====
 @app.route("/add", methods=["POST"])
 def add_opportunity():
     auth = require_admin()
@@ -441,67 +614,41 @@ def add_opportunity():
         tags = []
     tags_json = json.dumps(tags)
 
-    conn = get_db_connection()
-    cur = conn.cursor()
-    cur.execute(
-        """
-        INSERT INTO opportunities
-        (title, time, duration, mode, desc, requirements, location, image, tags, closed)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
-        """,
-        (
-            request.form.get("title"),
-            request.form.get("time", ""),
-            request.form.get("duration", ""),
-            request.form.get("mode", ""),
-            request.form.get("description", ""),
-            request.form.get("requirements", ""),
-            request.form.get("location", ""),
-            image_path if image_path else "default.png",
-            tags_json,
-        ),
-    )
-    conn.commit()
-    conn.close()
-    return jsonify({"message": "Opportunity added!"})
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO opportunities
+                    (title, time, duration, mode, description,
+                     requirements, location, image, tags, closed)
+                VALUES
+                    (%s, %s, %s, %s, %s,
+                     %s,           %s,       %s,   %s,   FALSE)
+                """,
+                (
+                    request.form.get("title"),
+                    request.form.get("time", ""),
+                    request.form.get("duration", ""),
+                    request.form.get("mode", ""),
+                    request.form.get("desc", ""),
+                    request.form.get("requirements", ""),
+                    request.form.get("location", ""),
+                    image_path if image_path else "default.png",
+                    tags_json,
+                ),
+            )
+
+    return jsonify({"message": "Opportunity added."})
 
 
-@app.route("/admin_request_access", methods=["POST"])
-def admin_request_access():
-    data = request.get_json()
-    email = data.get("email", "").strip().lower()
-
-    if not email.endswith("@kraskickers.org"):
-        return {"error": "Admin access requires a @kraskickers.org email address."}, 400
-
-    send_admin_activation_email(email)
-    return {"message": "A verification link has been sent to your KRAS Kickers email."}
-
-
-@app.route("/admin_activate/<token>")
-def admin_activate(token):
-    email = confirm_activation_token(token, max_age=3600)
-    if not email or not email.endswith("@kraskickers.org"):
-        return "Invalid or expired admin activation link.", 400
-
-    # Mark admin as verified
-    session["admin_verified"] = True
-    session.permanent = True
-
-    # Redirect directly back to the menu
-    return redirect(url_for("menu", admin_verified=1))
-
-
-
-# --- Update Opportunity ---
+# =====
+# Update opportunity
+# =====
 @app.route("/update/<int:opp_id>", methods=["POST"])
 def update_opportunity(opp_id):
     auth = require_admin()
     if auth:
         return auth
-
-    conn = get_db_connection()
-    cur = conn.cursor()
 
     tags_json = request.form.get("tags_json") or request.form.get("tags") or "[]"
     try:
@@ -510,80 +657,87 @@ def update_opportunity(opp_id):
         tags = []
     tags_json = json.dumps(tags)
 
-    update_fields = (
-        request.form.get("title"),
-        request.form.get("time", ""),
-        request.form.get("duration", ""),
-        request.form.get("mode", ""),
-        request.form.get("description", ""),
-        request.form.get("requirements", ""),
-        request.form.get("location", ""),
-        tags_json,
-        opp_id,
-    )
-
-    cur.execute(
-        """
-        UPDATE opportunities
-        SET title = ?, time = ?, duration = ?, mode = ?, desc = ?, requirements = ?, location = ?, tags = ?
-        WHERE id = ?
-        """,
-        update_fields,
-    )
-
-    if "image" in request.files:
-        file = request.files["image"]
-        if file and allowed_file(file.filename):
-            filename = secure_filename(file.filename).replace(" ", "_").lower()
-            file.save(os.path.join(app.config["UPLOAD_FOLDER"], filename))
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
             cur.execute(
-                "UPDATE opportunities SET image = ? WHERE id = ?",
-                (filename, opp_id),
+                """
+                UPDATE opportunities
+                SET title = %s,
+                    time = %s,
+                    duration = %s,
+                    mode = %s,
+                    description = %s,
+                    requirements = %s,
+                    location = %s,
+                    tags = %s
+                WHERE id = %s
+                """,
+                (
+                    request.form.get("title"),
+                    request.form.get("time", ""),
+                    request.form.get("duration", ""),
+                    request.form.get("mode", ""),
+                    request.form.get("desc", ""),
+                    request.form.get("requirements", ""),
+                    request.form.get("location", ""),
+                    tags_json,
+                    opp_id,
+                ),
             )
 
-    conn.commit()
-    conn.close()
-    return jsonify({"message": "Opportunity updated!"})
+            if "image" in request.files:
+                file = request.files["image"]
+                if file and allowed_file(file.filename):
+                    filename = (
+                        secure_filename(file.filename).replace(" ", "_").lower()
+                    )
+                    file.save(os.path.join(app.config["UPLOAD_FOLDER"], filename))
+                    cur.execute(
+                        "UPDATE opportunities SET image = %s WHERE id = %s",
+                        (filename, opp_id),
+                    )
+
+    return jsonify({"message": "Opportunity updated."})
 
 
-
-# --- Delete Opportunity ---
+# =====
+# Delete opportunity
+# =====
 @app.route("/delete/<int:opp_id>", methods=["POST"])
 def delete_opportunity(opp_id):
     auth = require_admin()
     if auth:
         return auth
 
-    conn = get_db_connection()
-    cur = conn.cursor()
-    cur.execute("DELETE FROM opportunities WHERE id = ?", (opp_id,))
-    conn.commit()
-    conn.close()
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM opportunities WHERE id = %s", (opp_id,))
+
     return jsonify({"message": "Opportunity deleted"})
 
 
-# --- Menu Page ---
-@app.route("/menu")
-def menu():
-    return render_template("Menu.html")
-
-
-# --- Close / Reopen Opportunity ---
+# =====
+# Close / reopen opportunity
+# =====
 @app.route("/close_opportunity/<int:opp_id>", methods=["POST"])
 def close_opportunity(opp_id):
     auth = require_admin()
     if auth:
         return auth
 
-    conn = get_db_connection()
-    cur = conn.cursor()
     closed_date = datetime.now().strftime("%Y-%m-%d %H:%M")
-    cur.execute(
-        "UPDATE opportunities SET closed = 1, closed_date = ? WHERE id = ?",
-        (closed_date, opp_id),
-    )
-    conn.commit()
-    conn.close()
+
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                UPDATE opportunities
+                SET closed = TRUE, closed_date = %s
+                WHERE id = %s
+                """,
+                (closed_date, opp_id),
+            )
+
     return jsonify({"message": "Opportunity marked as closed."})
 
 
@@ -593,28 +747,36 @@ def reopen_opportunity(opp_id):
     if auth:
         return auth
 
-    conn = get_db_connection()
-    cur = conn.cursor()
-    cur.execute(
-        "UPDATE opportunities SET closed = 0, closed_date = NULL WHERE id = ?",
-        (opp_id,),
-    )
-    conn.commit()
-    conn.close()
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                UPDATE opportunities
+                SET closed = FALSE, closed_date = NULL
+                WHERE id = %s
+                """,
+                (opp_id,),
+            )
+
     return jsonify({"message": "Opportunity reopened."})
 
 
-# --- Closed Opportunities ---
+# =====
+# Closed opportunities
+# =====
 @app.route("/closed")
 def closed_opportunities():
     auth = require_admin()
     if auth:
         return auth
 
-    conn = get_db_connection()
-    opp_rows = conn.execute("SELECT * FROM opportunities WHERE closed = 1").fetchall()
-    apps_rows = conn.execute("SELECT * FROM applications").fetchall()
-    conn.close()
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT * FROM opportunities WHERE closed IS TRUE")
+            opp_rows = cur.fetchall()
+
+            cur.execute("SELECT * FROM applications")
+            apps_rows = cur.fetchall()
 
     opportunities = dictify_rows(opp_rows)
     applications = dictify_rows(apps_rows)
@@ -628,6 +790,10 @@ def closed_opportunities():
                 opp["tags"] = []
         elif tags_raw is None:
             opp["tags"] = []
+
+        if "description" in opp and "desc" not in opp:
+            opp["desc"] = opp["description"]
+
         opp["frequency"] = opp.get("mode", "")
 
     for app_entry in applications:
@@ -656,26 +822,32 @@ def closed_opportunities():
     )
 
 
-# --- View Applicants ---
+# =====
+# View applicants for a given opportunity
+# =====
 @app.route("/applicants/<int:opp_id>")
 def view_applicants(opp_id):
     auth = require_admin()
     if auth:
         return auth
 
-    conn = get_db_connection()
-    opp_row = conn.execute(
-        "SELECT * FROM opportunities WHERE id = ?", (opp_id,)
-    ).fetchone()
-    if opp_row is None:
-        conn.close()
-        return "Opportunity not found", 404
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT * FROM opportunities WHERE id = %s", (opp_id,))
+            opp_row = cur.fetchone()
+            if opp_row is None:
+                return "Opportunity not found", 404
 
-    applicants_rows = conn.execute(
-        "SELECT * FROM applications WHERE title = ? ORDER BY timestamp DESC",
-        (opp_row["title"],),
-    ).fetchall()
-    conn.close()
+            title = opp_row["title"]
+            cur.execute(
+                """
+                SELECT * FROM applications
+                WHERE title = %s
+                ORDER BY timestamp DESC
+                """,
+                (title,),
+            )
+            applicants_rows = cur.fetchall()
 
     opportunity = dict(opp_row)
     tags_raw = opportunity.get("tags")
@@ -686,6 +858,10 @@ def view_applicants(opp_id):
             opportunity["tags"] = []
     elif tags_raw is None:
         opportunity["tags"] = []
+
+    if "description" in opportunity and "desc" not in opportunity:
+        opportunity["desc"] = opportunity["description"]
+
     opportunity["frequency"] = opportunity.get("mode", "")
 
     applicants = dictify_rows(applicants_rows)
@@ -715,22 +891,15 @@ def view_applicants(opp_id):
     )
 
 
-# --- Check Volunteer Status ---
+# =====
+# Check volunteer status
+# =====
 @app.route("/check")
 def check_volunteer():
-    email = request.args.get("email", "").strip().lower()
+    email = (request.args.get("email") or "").strip().lower()
 
     if not email:
         return jsonify({"error": "Email is required"}), 400
-
-    conn = get_db_connection()
-    cur = conn.cursor()
-
-    cur.execute(
-        "SELECT * FROM applications WHERE LOWER(email) = ? ORDER BY timestamp DESC",
-        (email,),
-    )
-    rows = cur.fetchall()
 
     response = {
         "exists": False,
@@ -742,83 +911,96 @@ def check_volunteer():
         "activation_message": "",
     }
 
-    if rows:
-        latest = rows[0]
-        response["exists"] = True
-        response["first_name"] = latest["first_name"]
-        response["last_name"] = latest["last_name"]
-        response["email"] = latest["email"]
-        response["phone"] = latest["phone"] or ""
-
-        session_email = session.get("verified_email", "").strip().lower()
-        session_verified = session.get("email_verified", False)
-
-        if session_verified and session_email == email:
-            response["activation_message"] = ""
-            response["redirect"] = "/?verified=1"
-
-        else:
-            send_activation_email(email)
-            response[
-                "activation_message"
-            ] = "We just sent a verification email. Please click the link in that email so you can submit your application."
-
-        if response["exists"] and response["activation_message"] == "":
-            assignment_rows = conn.execute(
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
                 """
-                SELECT
-                    a.timestamp AS submitted_at,
-                    a.title,
-                    o.time        AS time_commitment,
-                    o.duration    AS duration,
-                    o.mode        AS frequency,
-                    o.location    AS location
-                FROM applications a
-                LEFT JOIN opportunities o
-                    ON a.title = o.title
-                WHERE
-                    LOWER(a.email) = ?
-                    AND a.status = 'Assigned'
-                ORDER BY a.timestamp DESC
+                SELECT *
+                FROM applications
+                WHERE LOWER(email) = %s
+                ORDER BY timestamp DESC
                 """,
                 (email,),
-            ).fetchall()
+            )
+            rows = cur.fetchall()
 
-            assignments = [
-                {
-                    "submitted_at": row["submitted_at"],
-                    "title": row["title"],
-                    "time_commitment": row["time_commitment"],
-                    "duration": row["duration"],
-                    "frequency": row["frequency"],
-                    "location": row["location"],
-                }
-                for row in assignment_rows
-            ]
-            response["assignments"] = assignments
+            if rows:
+                latest = rows[0]
+                response["exists"] = True
+                response["first_name"] = latest.get("first_name") or ""
+                response["last_name"] = latest.get("last_name") or ""
+                response["email"] = latest.get("email") or ""
+                response["phone"] = latest.get("phone") or ""
 
-    else:
-        send_activation_email(email)
-        response[
-            "activation_message"
-        ] = "We just sent a verification email. Please click the link in that email so you can submit your application."
+                session_email = (session.get("verified_email") or "").strip().lower()
+                session_verified = session.get("email_verified", False)
 
-    conn.close()
+                if session_verified and session_email == email:
+                    response["activation_message"] = ""
+                    response["redirect"] = "/?verified=1"
+                else:
+                    send_activation_email(email)
+                    response[
+                        "activation_message"
+                    ] = "We just sent a verification email. Please click the link in that email so you can submit your application."
+
+                if response["exists"] and response.get("activation_message", "") == "":
+                    cur.execute(
+                        """
+                        SELECT
+                            a.timestamp AS submitted_at,
+                            a.title,
+                            o.time        AS time_commitment,
+                            o.duration    AS duration,
+                            o.mode        AS frequency,
+                            o.location    AS location
+                        FROM applications a
+                        LEFT JOIN opportunities o
+                            ON a.title = o.title
+                        WHERE
+                            LOWER(a.email) = %s
+                            AND a.status = 'Assigned'
+                        ORDER BY a.timestamp DESC
+                        """,
+                        (email,),
+                    )
+                    assignment_rows = cur.fetchall()
+                    assignments = []
+                    for row in assignment_rows:
+                        assignments.append(
+                            {
+                                "submitted_at": row.get("submitted_at"),
+                                "title": row.get("title"),
+                                "time_commitment": row.get("time_commitment"),
+                                "duration": row.get("duration"),
+                                "frequency": row.get("frequency"),
+                                "location": row.get("location"),
+                            }
+                        )
+                    response["assignments"] = assignments
+            else:
+                send_activation_email(email)
+                response[
+                    "activation_message"
+                ] = "We just sent a verification email. Please click the link in that email so you can submit your application."
+
     return jsonify(response)
 
 
-# --- Review ---
+# =====
+# Review all applications
+# =====
 @app.route("/review")
 def review():
     auth = require_admin()
     if auth:
         return auth
 
-    conn = get_db_connection()
-    rows = conn.execute(
-        "SELECT * FROM applications ORDER BY timestamp DESC"
-    ).fetchall()
-    conn.close()
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT * FROM applications ORDER BY timestamp DESC")
+            rows = cur.fetchall()
+
     applications = dictify_rows(rows)
 
     for app_entry in applications:
@@ -852,39 +1034,37 @@ def update_status(app_id):
     new_status = request.form.get("status", "Pending")
     ts = datetime.now().strftime("%Y-%m-%d %H:%M")
 
-    conn = get_db_connection()
-    cur = conn.cursor()
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT history FROM applications WHERE id = %s",
+                (app_id,),
+            )
+            row = cur.fetchone()
+            if not row:
+                return jsonify({"error": "Application not found"}), 404
 
-    row = cur.execute(
-        "SELECT history FROM applications WHERE id = ?", (app_id,)
-    ).fetchone()
-    if not row:
-        conn.close()
-        return jsonify({"error": "Application not found"}), 404
+            history_raw = row.get("history") or "[]"
+            try:
+                history_list = json.loads(history_raw)
+            except json.JSONDecodeError:
+                history_list = []
 
-    history_raw = row["history"] or "[]"
-    try:
-        history_list = json.loads(history_raw)
-    except json.JSONDecodeError:
-        history_list = []
+            history_list.append(
+                {
+                    "event": f"Status updated to {new_status}",
+                    "timestamp": ts,
+                }
+            )
 
-    history_list.append(
-        {
-            "event": f"Status updated to {new_status}",
-            "timestamp": ts,
-        }
-    )
-
-    cur.execute(
-        """
-        UPDATE applications
-        SET status = ?, history = ?
-        WHERE id = ?
-        """,
-        (new_status, json.dumps(history_list), app_id),
-    )
-    conn.commit()
-    conn.close()
+            cur.execute(
+                """
+                UPDATE applications
+                SET status = %s, history = %s
+                WHERE id = %s
+                """,
+                (new_status, json.dumps(history_list), app_id),
+            )
 
     return jsonify({"message": "Status updated successfully"})
 
@@ -895,28 +1075,27 @@ def delete_application(app_id):
     if auth:
         return auth
 
-    conn = get_db_connection()
-    cur = conn.cursor()
-    cur.execute("DELETE FROM applications WHERE id = ?", (app_id,))
-    conn.commit()
-    conn.close()
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM applications WHERE id = %s", (app_id,))
+
     return jsonify({"message": "Application deleted successfully."})
 
 
-
-
-# --- Volunteers Overview ---
+# =====
+# Volunteers overview
+# =====
 @app.route("/volunteers")
 def volunteers():
     auth = require_admin()
     if auth:
         return auth
 
-    conn = get_db_connection()
-    rows = conn.execute(
-        "SELECT * FROM applications ORDER BY timestamp DESC"
-    ).fetchall()
-    conn.close()
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT * FROM applications ORDER BY timestamp DESC")
+            rows = cur.fetchall()
+
     applications = dictify_rows(rows)
 
     for app_entry in applications:
@@ -941,49 +1120,48 @@ def volunteers():
     return render_template("volunteers.html", applications=applications)
 
 
-# --- Volunteer Detail ---
+# =====
+# Volunteer detail
+# =====
 @app.route("/volunteer/<int:app_id>")
 def volunteer_detail(app_id):
     auth = require_admin()
     if auth:
         return auth
 
-    conn = get_db_connection()
-    row = conn.execute(
-        "SELECT * FROM applications WHERE id = ?",
-        (app_id,),
-    ).fetchone()
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT * FROM applications WHERE id = %s", (app_id,))
+            row = cur.fetchone()
+            if not row:
+                return "Application not found", 404
 
-    if not row:
-        conn.close()
-        return "Application not found", 404
+            app_entry = dict(row)
 
-    app_entry = dict(row)
-    history_raw = app_entry.get("history")
-    if isinstance(history_raw, str) and history_raw.strip():
-        try:
-            app_entry["history"] = json.loads(history_raw)
-        except json.JSONDecodeError:
-            app_entry["history"] = []
-    else:
-        app_entry["history"] = []
+            history_raw = app_entry.get("history")
+            if isinstance(history_raw, str) and history_raw.strip():
+                try:
+                    app_entry["history"] = json.loads(history_raw)
+                except json.JSONDecodeError:
+                    app_entry["history"] = []
+            else:
+                app_entry["history"] = []
 
-    notes_raw = app_entry.get("notes")
-    if isinstance(notes_raw, str) and notes_raw.strip():
-        try:
-            app_entry["notes"] = json.loads(notes_raw)
-        except json.JSONDecodeError:
-            app_entry["notes"] = []
-    else:
-        app_entry["notes"] = []
+            notes_raw = app_entry.get("notes")
+            if isinstance(notes_raw, str) and notes_raw.strip():
+                try:
+                    app_entry["notes"] = json.loads(notes_raw)
+                except json.JSONDecodeError:
+                    app_entry["notes"] = []
+            else:
+                app_entry["notes"] = []
 
-    opp_row = conn.execute(
-        "SELECT id FROM opportunities WHERE title = ?",
-        (app_entry.get("title", ""),),
-    ).fetchone()
-    conn.close()
-
-    back_opp_id = opp_row["id"] if opp_row else None
+            cur.execute(
+                "SELECT id FROM opportunities WHERE title = %s",
+                (app_entry.get("title", ""),),
+            )
+            opp_row = cur.fetchone()
+            back_opp_id = opp_row["id"] if opp_row else None
 
     return render_template(
         "review_detail.html",
@@ -992,134 +1170,71 @@ def volunteer_detail(app_id):
     )
 
 
-
-# --- Admin Notes ---
+# =====
+# Admin notes
+# =====
 @app.route("/add_note/<int:app_id>", methods=["POST"])
 def add_note(app_id):
     auth = require_admin()
     if auth:
         return auth
 
-    note_text = request.form.get("note", "").strip()
+    note_text = (request.form.get("note") or "").strip()
     if not note_text:
         return jsonify({"error": "Note cannot be empty."}), 400
 
-    conn = get_db_connection()
-    cur = conn.cursor()
-
-    row = cur.execute(
-        "SELECT history, notes FROM applications WHERE id = ?",
-        (app_id,),
-    ).fetchone()
-
-    if not row:
-        conn.close()
-        return jsonify({"error": "Application not found"}), 404
-
-    history_raw = row["history"] or "[]"
-    try:
-        history_list = json.loads(history_raw)
-    except json.JSONDecodeError:
-        history_list = []
-
-    notes_raw = row["notes"] or "[]"
-    try:
-        notes_list = json.loads(notes_raw)
-    except json.JSONDecodeError:
-        notes_list = []
-
     ts = datetime.now().strftime("%Y-%m-%d %H:%M")
 
-    note_entry = {
-        "note": note_text,
-        "timestamp": ts,
-    }
-    notes_list.append(note_entry)
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT history, notes FROM applications WHERE id = %s",
+                (app_id,),
+            )
+            row = cur.fetchone()
+            if not row:
+                return jsonify({"error": "Application not found"}), 404
 
-    history_list.append(
-        {
-            "event": "Admin note added",
-            "timestamp": ts,
-        }
-    )
+            history_raw = row.get("history") or "[]"
+            notes_raw = row.get("notes") or "[]"
 
-    cur.execute(
-        """
-        UPDATE applications
-        SET notes = ?, history = ?
-        WHERE id = ?
-        """,
-        (json.dumps(notes_list), json.dumps(history_list), app_id),
-    )
-    conn.commit()
-    conn.close()
+            try:
+                history_list = json.loads(history_raw)
+            except json.JSONDecodeError:
+                history_list = []
+
+            try:
+                notes_list = json.loads(notes_raw)
+            except json.JSONDecodeError:
+                notes_list = []
+
+            note_entry = {
+                "note": note_text,
+                "timestamp": ts,
+            }
+            notes_list.append(note_entry)
+
+            history_list.append(
+                {
+                    "event": "Admin note added",
+                    "timestamp": ts,
+                }
+            )
+
+            cur.execute(
+                """
+                UPDATE applications
+                SET notes = %s, history = %s
+                WHERE id = %s
+                """,
+                (json.dumps(notes_list), json.dumps(history_list), app_id),
+            )
 
     return jsonify({"message": "Note added successfully."})
-@app.route("/api/champions")
-def api_champions():
-    conn = get_db()
-    c = conn.cursor()
-
-    # Fetch volunteers who applied to the "Champion" opportunity AND were approved
-    c.execute("""
-        SELECT id, first_name, last_name, email
-        FROM volunteers
-        WHERE applied_for = 'Champion'
-        AND status = 'Approved'
-    """)
-
-    rows = c.fetchall()
-    conn.close()
-
-    return jsonify([dict(row) for row in rows])
-
-@app.route("/api/opportunity_champions/<int:opp_id>")
-def api_opportunity_champions(opp_id):
-    conn = get_db()
-    c = conn.cursor()
-
-    c.execute("""
-        SELECT v.id, v.first_name, v.last_name, v.email
-        FROM champions_opportunities co
-        JOIN volunteers v ON co.champion_id = v.id
-        WHERE co.opportunity_id = ?
-    """, (opp_id,))
-
-    rows = c.fetchall()
-    conn.close()
-
-    return jsonify([dict(row) for row in rows])
-@app.route("/api/assign_champion", methods=["POST"])
-def api_assign_champion():
-    champion_id = request.form.get("champion_id")
-    opportunity_id = request.form.get("opportunity_id")
-
-    if not champion_id or not opportunity_id:
-        return jsonify({"error": "Missing data"}), 400
-
-    conn = get_db()
-    c = conn.cursor()
-
-    # Prevent duplicate assignments
-    c.execute("""
-        SELECT id FROM champions_opportunities
-        WHERE champion_id = ? AND opportunity_id = ?
-    """, (champion_id, opportunity_id))
-
-    if c.fetchone():
-        conn.close()
-        return jsonify({"message": "Champion already assigned."})
-
-    c.execute("""
-        INSERT INTO champions_opportunities (champion_id, opportunity_id)
-        VALUES (?, ?)
-    """, (champion_id, opportunity_id))
-
-    conn.commit()
-    conn.close()
-
-    return jsonify({"message": "Champion assigned successfully."})
 
 
+# =====
+# Local dev entrypoint
+# =====
 if __name__ == "__main__":
     app.run(debug=True)
