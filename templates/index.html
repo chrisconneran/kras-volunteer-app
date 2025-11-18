@@ -512,11 +512,16 @@
       if (params.get("verified") === "1") {
         unlockAllSections();
 
-        let verifiedEmail = $("#check_email").val().trim().toLowerCase();
-        if (!verifiedEmail && storedVolunteer && storedVolunteer.email) {
-          verifiedEmail = storedVolunteer.email.toLowerCase();
-          $("#check_email").val(storedVolunteer.email);
-        }
+       // Always prefer stored volunteer email after verification
+          let verifiedEmail = (storedVolunteer && storedVolunteer.email)
+                                ? storedVolunteer.email.toLowerCase()
+                                : $("#check_email").val().trim().toLowerCase();
+
+          // If stored email exists, ensure form shows it
+          if (storedVolunteer && storedVolunteer.email) {
+              $("#check_email").val(storedVolunteer.email);
+          }
+
 
           if (verifiedEmail) {
             $.get("/check", { email: verifiedEmail }, function(resp) {
