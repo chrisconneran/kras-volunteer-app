@@ -1,28 +1,25 @@
 from flask import Flask, render_template, request, jsonify, redirect, url_for, session
-from datetime import datetime
+from datetime import datetime, timedelta
 import os
 import json
-import sqlite3
 from werkzeug.utils import secure_filename
 
 from itsdangerous import URLSafeTimedSerializer
 import smtplib
 from email.message import EmailMessage
 
+import psycopg
+from psycopg.rows import dict_row
+
 
 app = Flask(__name__, static_folder="static", static_url_path="/static")
 app.secret_key = "supersecretkey"
 serializer = URLSafeTimedSerializer(app.secret_key)
-# Ensure uploads folder works on Render
-app.config["UPLOAD_FOLDER"] = "static"
 
-# Create the folder if it doesn't exist
+app.config["UPLOAD_FOLDER"] = "static"
 os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
 
-
-from datetime import timedelta
 app.permanent_session_lifetime = timedelta(minutes=30)
-
 
 
 def require_admin():
@@ -30,128 +27,116 @@ def require_admin():
         return redirect(url_for("menu"))
 
 
-# --- SQLite setup ---
-DB_FILE = "volunteers.db"
+DATABASE_URL = os.getenv("DATABASE_URL")
 
 
 def get_db_connection():
-    conn = sqlite3.connect(DB_FILE)
-    conn.row_factory = sqlite3.Row
+    """
+    Open a Postgres connection using psycopg with dict-style rows.
+    """
+    conn = psycopg.connect(DATABASE_URL, row_factory=dict_row)
     return conn
 
 
-def create_tables():
-    conn = get_db_connection()
-    cur = conn.cursor()
-
-    cur.execute(
-        """
-        CREATE TABLE IF NOT EXISTS applications (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            first_name TEXT,
-            last_name TEXT,
-            email TEXT,
-            phone TEXT,
-            contact TEXT,
-            title TEXT,
-            time TEXT,
-            duration TEXT,
-            mode TEXT,
-            location TEXT,
-            comments TEXT,
-            status TEXT,
-            timestamp TEXT,
-            history TEXT,
-            notes TEXT
-        )
-        """
-    )
-
-    cur.execute(
-        """
-        CREATE TABLE IF NOT EXISTS opportunities (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            title TEXT,
-            time TEXT,
-            duration TEXT,
-            mode TEXT,
-            desc TEXT,
-            requirements TEXT,
-            location TEXT,
-            image TEXT,
-            tags TEXT,
-            closed INTEGER DEFAULT 0,
-            closed_date TEXT
-        )
-        """
-    )
-
-    conn.commit()
-    conn.close()
-
-
 def seed_opportunities():
-    conn = get_db_connection()
-    cur = conn.cursor()
+    """
+    If opportunities table is empty, insert a few sample rows.
+    Safe to call multiple times.
+    """
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("SELECT COUNT(*) AS cnt FROM opportunities")
+        row = cur.fetchone()
+        count = row["cnt"] if row else 0
 
-    cur.execute("SELECT COUNT(*) AS cnt FROM opportunities")
-    count = cur.fetchone()["cnt"]
-    if count == 0:
-        sample_data = [
-            (
-                "Social Media Ambassador",
-                "2-3 hrs/week",
-                "3 months",
-                "Remote",
-                "Help spread awareness about KRAS-targeted lung cancer via social media campaigns.",
-                "Basic social media skills. Training on key messages provided.",
-                "Remote",
-                "social_media.png",
-                json.dumps(["Awareness", "Remote", "Flexible"]),
-            ),
-            (
-                "Clinical Trial Navigator",
-                "4-5 hrs/week",
-                "6 months",
-                "Hybrid",
-                "Assist patients and families in understanding and navigating KRAS clinical trial options.",
-                "Background in healthcare or patient support preferred. Training provided.",
-                "Hybrid: Online and occasional in-person meetings.",
-                "clinical_navigator.png",
-                json.dumps(["Clinical", "Patient Support", "Hybrid"]),
-            ),
-            (
-                "Event Volunteer",
-                "4-6 hrs/event",
-                "Per event",
-                "In-Person",
-                "Support KRAS Kickers awareness events with setup, check-in, and engagement.",
-                "Comfortable around crowds and public-facing roles.",
-                "Various event locations nationwide.",
-                "event_volunteer.png",
-                json.dumps(["Events", "In-Person"]),
-            ),
-        ]
+        if count == 0:
+            sample_data = [
+                (
+                    "Social Media Ambassador",
+                    "2-3 hrs/week",
+                    "3 months",
+                    "Remote",
+                    "Help spread awareness about KRAS-targeted lung cancer via social media campaigns.",
+                    "Basic social media skills. Training on key messages provided.",
+                    "Remote",
+                    "social_media.png",
+                    json.dumps(["Awareness", "Remote", "Flexible"]),
+                ),
+                (
+                    "Clinical Trial Navigator",
+                    "4-5 hrs/week",
+                    "6 months",
+                    "Hybrid",
+                    "Assist patients and families in understanding and navigating KRAS clinical trial options.",
+                    "Background in healthcare or patient support preferred. Training provided.",
+                    "Hybrid: Online and occasional in-person meetings.",
+                    "clinical_navigator.png",
+                    json.dumps(["Clinical", "Patient Support", "Hybrid"]),
+                ),
+                (
+                    "Event Volunteer",
+                    "4-6 hrs/event",
+                    "Per event",
+                    "In-Person",
+                    "Support KRAS Kickers awareness events with setup, check-in, and engagement.",
+                    "Comfortable around crowds and public-facing roles.",
+                    "Various event locations nationwide.",
+                    "event_volunteer.png",
+                    json.dumps(["Events", "In-Person"]),
+                ),
+            ]
 
-        for title, time_txt, duration, mode, desc, reqs, location, image, tags in sample_data:
-            cur.execute(
-                """
-                INSERT INTO opportunities
-                (title, time, duration, mode, desc, requirements, location, image, tags, closed)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
-                """,
-                (title, time_txt, duration, mode, desc, reqs, location, image, tags),
-            )
+            for (
+                title,
+                time_txt,
+                duration,
+                mode,
+                description,
+                reqs,
+                location,
+                image,
+                tags,
+            ) in sample_data:
+                cur.execute(
+                    """
+                    INSERT INTO opportunities
+                        (title, time, duration, mode, description, requirements, location, image, tags, closed)
+                    VALUES
+                        (%s,   %s,   %s,       %s,   %s,          %s,           %s,       %s,    %s,   FALSE)
+                    """,
+                    (
+                        title,
+                        time_txt,
+                        duration,
+                        mode,
+                        description,
+                        reqs,
+                        location,
+                        image,
+                        tags,
+                    ),
+                )
 
-        conn.commit()
-    conn.close()
+            conn.commit()
+    except Exception:
+        # If table does not exist or anything goes wrong, just skip seeding
+        pass
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
 
 
-create_tables()
 seed_opportunities()
 
 
 def dictify_rows(rows):
+    """
+    Convert a sequence of mapping-like rows into a list of plain dicts.
+    Works with psycopg dict_row results.
+    """
     result = []
     for r in rows:
         d = {}
@@ -187,8 +172,14 @@ def save_application(form_data: dict) -> int:
     cur.execute(
         """
         INSERT INTO applications
-        (first_name, last_name, email, phone, contact, title, time, duration, mode, location, comments, status, timestamp, history, notes)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (first_name, last_name, email, phone, contact,
+             title, time, duration, mode, location,
+             comments, status, timestamp, history, notes)
+        VALUES
+            (%s, %s, %s, %s, %s,
+             %s, %s, %s, %s, %s,
+             %s, %s, %s, %s, %s)
+        RETURNING id
         """,
         (
             form_data.get("first_name"),
@@ -208,15 +199,11 @@ def save_application(form_data: dict) -> int:
             json.dumps(notes_list),
         ),
     )
+    row = cur.fetchone()
     conn.commit()
-    app_id = cur.lastrowid
     conn.close()
+    app_id = row["id"] if row else None
     return app_id
-
-
-# -----------------------------------
-# Email + Token Helper Functions
-# -----------------------------------
 
 
 def generate_activation_token(email: str) -> str:
@@ -276,6 +263,7 @@ If you did not request this, you can ignore this message.
             server.login(smtp_user, smtp_password)
         server.send_message(msg)
 
+
 @app.route("/logout")
 def logout():
     session.pop("email_verified", None)
@@ -324,11 +312,9 @@ def activate_email(token):
     session["email_verified"] = True
     session["verified_email"] = email
 
-    # Redirect user directly to main page like Google/Amazon
     return redirect(url_for("index", verified=1))
 
 
-# --- HOME PAGE ---
 @app.route("/", methods=["GET", "POST"])
 def index():
     if request.method == "POST":
@@ -359,18 +345,17 @@ def index():
 
         app_id = save_application(request.form.to_dict())
         return jsonify(
-    {
-        "status": "success",
-        "title": request.form.get("title"),
-        "message": "Thank you! Your volunteer application has been submitted.",
-        "application_id": app_id,
-    }
-)
-
+            {
+                "status": "success",
+                "title": request.form.get("title"),
+                "message": "Thank you. Your volunteer application has been submitted.",
+                "application_id": app_id,
+            }
+        )
 
     conn = get_db_connection()
     rows = conn.execute(
-        "SELECT * FROM opportunities WHERE closed = 0 OR closed IS NULL"
+        "SELECT * FROM opportunities WHERE closed = FALSE OR closed IS NULL"
     ).fetchall()
     conn.close()
     opportunities = dictify_rows(rows)
@@ -386,11 +371,10 @@ def index():
             opp["tags"] = []
         opp["frequency"] = opp.get("mode", "")
 
+        if "description" in opp and "desc" not in opp:
+            opp["desc"] = opp["description"]
+
     return render_template("index.html", opportunities=opportunities)
-
-
-
-# --- Manage Active Opportunities ---
 @app.route("/manage", methods=["GET"])
 def manage():
     auth = require_admin()
@@ -399,7 +383,7 @@ def manage():
 
     conn = get_db_connection()
     rows = conn.execute(
-        "SELECT * FROM opportunities WHERE closed = 0 OR closed IS NULL"
+        "SELECT * FROM opportunities WHERE closed = FALSE OR closed IS NULL"
     ).fetchall()
     conn.close()
     opportunities = dictify_rows(rows)
@@ -415,57 +399,93 @@ def manage():
             opp["tags"] = []
         opp["frequency"] = opp.get("mode", "")
 
+        if "description" in opp and "desc" not in opp:
+            opp["desc"] = opp["description"]
+
     return render_template("manage.html", opportunities=opportunities)
 
+
 @app.route("/api/champions")
-def get_champions():
+def api_champions():
+    """
+    Return all approved champions.
+    For now, champions are applications with is_champion set true.
+    """
     conn = get_db_connection()
-    champions = conn.execute(
-        "SELECT id, first_name, last_name, email FROM applications WHERE is_champion = 1 ORDER BY first_name"
+    rows = conn.execute(
+        """
+        SELECT id, first_name, last_name, email
+        FROM applications
+        WHERE is_champion = TRUE
+        ORDER BY first_name, last_name
+        """
     ).fetchall()
     conn.close()
-    return jsonify([dict(row) for row in champions])
+    return jsonify(dictify_rows(rows))
 
-@app.route("/assign_champion", methods=["POST"])
-def assign_champion():
+
+@app.route("/api/opportunity_champions/<int:opp_id>")
+def api_opportunity_champions(opp_id):
+    conn = get_db_connection()
+    rows = conn.execute(
+        """
+        SELECT
+            co.id,
+            a.first_name,
+            a.last_name,
+            a.email
+        FROM champions_opportunities AS co
+        JOIN applications AS a
+            ON co.champion_id = a.id
+        WHERE co.opportunity_id = %s
+        ORDER BY a.first_name, a.last_name
+        """,
+        (opp_id,),
+    ).fetchall()
+    conn.close()
+    return jsonify(dictify_rows(rows))
+
+
+@app.route("/api/assign_champion", methods=["POST"])
+def api_assign_champion():
     if not session.get("admin_verified"):
         return jsonify({"error": "Not authorized"}), 403
 
-    data = request.json
-    champion_id = data.get("champion_id")
-    opportunity_id = data.get("opportunity_id")
+    champion_id = request.form.get("champion_id")
+    opportunity_id = request.form.get("opportunity_id")
 
     if not champion_id or not opportunity_id:
         return jsonify({"error": "Missing data"}), 400
 
     conn = get_db_connection()
-    conn.execute(
-        "INSERT INTO champions_opportunities (champion_id, opportunity_id) VALUES (?, ?)",
-        (champion_id, opportunity_id)
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        SELECT id
+        FROM champions_opportunities
+        WHERE champion_id = %s AND opportunity_id = %s
+        """,
+        (champion_id, opportunity_id),
+    )
+    existing = cur.fetchone()
+    if existing:
+        conn.close()
+        return jsonify({"message": "Champion already assigned."})
+
+    cur.execute(
+        """
+        INSERT INTO champions_opportunities (champion_id, opportunity_id)
+        VALUES (%s, %s)
+        """,
+        (champion_id, opportunity_id),
     )
     conn.commit()
     conn.close()
 
-    return jsonify({"message": "Champion assigned successfully"})
-
-@app.route("/api/opportunity_champions/<int:opp_id>")
-def get_opportunity_champions(opp_id):
-    conn = get_db_connection()
-    rows = conn.execute(
-        """
-        SELECT c.id, a.first_name, a.last_name, a.email
-        FROM champions_opportunities c
-        JOIN applications a ON c.champion_id = a.id
-        WHERE c.opportunity_id = ?
-        """,
-        (opp_id,)
-    ).fetchall()
-    conn.close()
-    return jsonify([dict(row) for row in rows])
+    return jsonify({"message": "Champion assigned successfully."})
 
 
-
-# --- Add Opportunity ---
 @app.route("/add", methods=["POST"])
 def add_opportunity():
     auth = require_admin()
@@ -492,8 +512,11 @@ def add_opportunity():
     cur.execute(
         """
         INSERT INTO opportunities
-        (title, time, duration, mode, desc, requirements, location, image, tags, closed)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
+            (title, time, duration, mode, description,
+             requirements, location, image, tags, closed)
+        VALUES
+            (%s,   %s,   %s,       %s,   %s,
+             %s,           %s,       %s,    %s,   FALSE)
         """,
         (
             request.form.get("title"),
@@ -509,7 +532,7 @@ def add_opportunity():
     )
     conn.commit()
     conn.close()
-    return jsonify({"message": "Opportunity added!"})
+    return jsonify({"message": "Opportunity added."})
 
 
 @app.route("/admin_request_access", methods=["POST"])
@@ -530,16 +553,12 @@ def admin_activate(token):
     if not email or not email.endswith("@kraskickers.org"):
         return "Invalid or expired admin activation link.", 400
 
-    # Mark admin as verified
     session["admin_verified"] = True
     session.permanent = True
 
-    # Redirect directly back to the menu
     return redirect(url_for("menu", admin_verified=1))
 
 
-
-# --- Update Opportunity ---
 @app.route("/update/<int:opp_id>", methods=["POST"])
 def update_opportunity(opp_id):
     auth = require_admin()
@@ -571,8 +590,15 @@ def update_opportunity(opp_id):
     cur.execute(
         """
         UPDATE opportunities
-        SET title = ?, time = ?, duration = ?, mode = ?, desc = ?, requirements = ?, location = ?, tags = ?
-        WHERE id = ?
+        SET title = %s,
+            time = %s,
+            duration = %s,
+            mode = %s,
+            description = %s,
+            requirements = %s,
+            location = %s,
+            tags = %s
+        WHERE id = %s
         """,
         update_fields,
     )
@@ -583,17 +609,15 @@ def update_opportunity(opp_id):
             filename = secure_filename(file.filename).replace(" ", "_").lower()
             file.save(os.path.join(app.config["UPLOAD_FOLDER"], filename))
             cur.execute(
-                "UPDATE opportunities SET image = ? WHERE id = ?",
+                "UPDATE opportunities SET image = %s WHERE id = %s",
                 (filename, opp_id),
             )
 
     conn.commit()
     conn.close()
-    return jsonify({"message": "Opportunity updated!"})
+    return jsonify({"message": "Opportunity updated."})
 
 
-
-# --- Delete Opportunity ---
 @app.route("/delete/<int:opp_id>", methods=["POST"])
 def delete_opportunity(opp_id):
     auth = require_admin()
@@ -602,19 +626,17 @@ def delete_opportunity(opp_id):
 
     conn = get_db_connection()
     cur = conn.cursor()
-    cur.execute("DELETE FROM opportunities WHERE id = ?", (opp_id,))
+    cur.execute("DELETE FROM opportunities WHERE id = %s", (opp_id,))
     conn.commit()
     conn.close()
     return jsonify({"message": "Opportunity deleted"})
 
 
-# --- Menu Page ---
 @app.route("/menu")
 def menu():
     return render_template("Menu.html")
 
 
-# --- Close / Reopen Opportunity ---
 @app.route("/close_opportunity/<int:opp_id>", methods=["POST"])
 def close_opportunity(opp_id):
     auth = require_admin()
@@ -625,7 +647,7 @@ def close_opportunity(opp_id):
     cur = conn.cursor()
     closed_date = datetime.now().strftime("%Y-%m-%d %H:%M")
     cur.execute(
-        "UPDATE opportunities SET closed = 1, closed_date = ? WHERE id = ?",
+        "UPDATE opportunities SET closed = TRUE, closed_date = %s WHERE id = %s",
         (closed_date, opp_id),
     )
     conn.commit()
@@ -642,7 +664,7 @@ def reopen_opportunity(opp_id):
     conn = get_db_connection()
     cur = conn.cursor()
     cur.execute(
-        "UPDATE opportunities SET closed = 0, closed_date = NULL WHERE id = ?",
+        "UPDATE opportunities SET closed = FALSE, closed_date = NULL WHERE id = %s",
         (opp_id,),
     )
     conn.commit()
@@ -650,7 +672,6 @@ def reopen_opportunity(opp_id):
     return jsonify({"message": "Opportunity reopened."})
 
 
-# --- Closed Opportunities ---
 @app.route("/closed")
 def closed_opportunities():
     auth = require_admin()
@@ -658,7 +679,9 @@ def closed_opportunities():
         return auth
 
     conn = get_db_connection()
-    opp_rows = conn.execute("SELECT * FROM opportunities WHERE closed = 1").fetchall()
+    opp_rows = conn.execute(
+        "SELECT * FROM opportunities WHERE closed = TRUE"
+    ).fetchall()
     apps_rows = conn.execute("SELECT * FROM applications").fetchall()
     conn.close()
 
@@ -675,6 +698,9 @@ def closed_opportunities():
         elif tags_raw is None:
             opp["tags"] = []
         opp["frequency"] = opp.get("mode", "")
+
+        if "description" in opp and "desc" not in opp:
+            opp["desc"] = opp["description"]
 
     for app_entry in applications:
         history_raw = app_entry.get("history")
@@ -702,7 +728,6 @@ def closed_opportunities():
     )
 
 
-# --- View Applicants ---
 @app.route("/applicants/<int:opp_id>")
 def view_applicants(opp_id):
     auth = require_admin()
@@ -711,14 +736,20 @@ def view_applicants(opp_id):
 
     conn = get_db_connection()
     opp_row = conn.execute(
-        "SELECT * FROM opportunities WHERE id = ?", (opp_id,)
+        "SELECT * FROM opportunities WHERE id = %s",
+        (opp_id,),
     ).fetchone()
     if opp_row is None:
         conn.close()
         return "Opportunity not found", 404
 
     applicants_rows = conn.execute(
-        "SELECT * FROM applications WHERE title = ? ORDER BY timestamp DESC",
+        """
+        SELECT *
+        FROM applications
+        WHERE title = %s
+        ORDER BY timestamp DESC
+        """,
         (opp_row["title"],),
     ).fetchall()
     conn.close()
@@ -733,6 +764,8 @@ def view_applicants(opp_id):
     elif tags_raw is None:
         opportunity["tags"] = []
     opportunity["frequency"] = opportunity.get("mode", "")
+    if "description" in opportunity and "desc" not in opportunity:
+        opportunity["desc"] = opportunity["description"]
 
     applicants = dictify_rows(applicants_rows)
     for app_entry in applicants:
@@ -761,7 +794,6 @@ def view_applicants(opp_id):
     )
 
 
-# --- Check Volunteer Status ---
 @app.route("/check")
 def check_volunteer():
     email = request.args.get("email", "").strip().lower()
@@ -773,7 +805,12 @@ def check_volunteer():
     cur = conn.cursor()
 
     cur.execute(
-        "SELECT * FROM applications WHERE LOWER(email) = ? ORDER BY timestamp DESC",
+        """
+        SELECT *
+        FROM applications
+        WHERE LOWER(email) = %s
+        ORDER BY timestamp DESC
+        """,
         (email,),
     )
     rows = cur.fetchall()
@@ -802,7 +839,6 @@ def check_volunteer():
         if session_verified and session_email == email:
             response["activation_message"] = ""
             response["redirect"] = "/?verified=1"
-
         else:
             send_activation_email(email)
             response[
@@ -815,15 +851,15 @@ def check_volunteer():
                 SELECT
                     a.timestamp AS submitted_at,
                     a.title,
-                    o.time        AS time_commitment,
-                    o.duration    AS duration,
-                    o.mode        AS frequency,
-                    o.location    AS location
-                FROM applications a
-                LEFT JOIN opportunities o
+                    o.time     AS time_commitment,
+                    o.duration AS duration,
+                    o.mode     AS frequency,
+                    o.location AS location
+                FROM applications AS a
+                LEFT JOIN opportunities AS o
                     ON a.title = o.title
                 WHERE
-                    LOWER(a.email) = ?
+                    LOWER(a.email) = %s
                     AND a.status = 'Assigned'
                 ORDER BY a.timestamp DESC
                 """,
@@ -842,7 +878,6 @@ def check_volunteer():
                 for row in assignment_rows
             ]
             response["assignments"] = assignments
-
     else:
         send_activation_email(email)
         response[
@@ -853,7 +888,6 @@ def check_volunteer():
     return jsonify(response)
 
 
-# --- Review ---
 @app.route("/review")
 def review():
     auth = require_admin()
@@ -902,7 +936,8 @@ def update_status(app_id):
     cur = conn.cursor()
 
     row = cur.execute(
-        "SELECT history FROM applications WHERE id = ?", (app_id,)
+        "SELECT history FROM applications WHERE id = %s",
+        (app_id,),
     ).fetchone()
     if not row:
         conn.close()
@@ -924,8 +959,8 @@ def update_status(app_id):
     cur.execute(
         """
         UPDATE applications
-        SET status = ?, history = ?
-        WHERE id = ?
+        SET status = %s, history = %s
+        WHERE id = %s
         """,
         (new_status, json.dumps(history_list), app_id),
     )
@@ -943,15 +978,12 @@ def delete_application(app_id):
 
     conn = get_db_connection()
     cur = conn.cursor()
-    cur.execute("DELETE FROM applications WHERE id = ?", (app_id,))
+    cur.execute("DELETE FROM applications WHERE id = %s", (app_id,))
     conn.commit()
     conn.close()
     return jsonify({"message": "Application deleted successfully."})
 
 
-
-
-# --- Volunteers Overview ---
 @app.route("/volunteers")
 def volunteers():
     auth = require_admin()
@@ -987,7 +1019,6 @@ def volunteers():
     return render_template("volunteers.html", applications=applications)
 
 
-# --- Volunteer Detail ---
 @app.route("/volunteer/<int:app_id>")
 def volunteer_detail(app_id):
     auth = require_admin()
@@ -996,7 +1027,7 @@ def volunteer_detail(app_id):
 
     conn = get_db_connection()
     row = conn.execute(
-        "SELECT * FROM applications WHERE id = ?",
+        "SELECT * FROM applications WHERE id = %s",
         (app_id,),
     ).fetchone()
 
@@ -1024,7 +1055,7 @@ def volunteer_detail(app_id):
         app_entry["notes"] = []
 
     opp_row = conn.execute(
-        "SELECT id FROM opportunities WHERE title = ?",
+        "SELECT id FROM opportunities WHERE title = %s",
         (app_entry.get("title", ""),),
     ).fetchone()
     conn.close()
@@ -1038,8 +1069,6 @@ def volunteer_detail(app_id):
     )
 
 
-
-# --- Admin Notes ---
 @app.route("/add_note/<int:app_id>", methods=["POST"])
 def add_note(app_id):
     auth = require_admin()
@@ -1054,7 +1083,7 @@ def add_note(app_id):
     cur = conn.cursor()
 
     row = cur.execute(
-        "SELECT history, notes FROM applications WHERE id = ?",
+        "SELECT history, notes FROM applications WHERE id = %s",
         (app_id,),
     ).fetchone()
 
@@ -1092,8 +1121,8 @@ def add_note(app_id):
     cur.execute(
         """
         UPDATE applications
-        SET notes = ?, history = ?
-        WHERE id = ?
+        SET notes = %s, history = %s
+        WHERE id = %s
         """,
         (json.dumps(notes_list), json.dumps(history_list), app_id),
     )
@@ -1101,70 +1130,6 @@ def add_note(app_id):
     conn.close()
 
     return jsonify({"message": "Note added successfully."})
-@app.route("/api/champions")
-def api_champions():
-    conn = get_db()
-    c = conn.cursor()
-
-    # Fetch volunteers who applied to the "Champion" opportunity AND were approved
-    c.execute("""
-        SELECT id, first_name, last_name, email
-        FROM volunteers
-        WHERE applied_for = 'Champion'
-        AND status = 'Approved'
-    """)
-
-    rows = c.fetchall()
-    conn.close()
-
-    return jsonify([dict(row) for row in rows])
-
-@app.route("/api/opportunity_champions/<int:opp_id>")
-def api_opportunity_champions(opp_id):
-    conn = get_db()
-    c = conn.cursor()
-
-    c.execute("""
-        SELECT v.id, v.first_name, v.last_name, v.email
-        FROM champions_opportunities co
-        JOIN volunteers v ON co.champion_id = v.id
-        WHERE co.opportunity_id = ?
-    """, (opp_id,))
-
-    rows = c.fetchall()
-    conn.close()
-
-    return jsonify([dict(row) for row in rows])
-@app.route("/api/assign_champion", methods=["POST"])
-def api_assign_champion():
-    champion_id = request.form.get("champion_id")
-    opportunity_id = request.form.get("opportunity_id")
-
-    if not champion_id or not opportunity_id:
-        return jsonify({"error": "Missing data"}), 400
-
-    conn = get_db()
-    c = conn.cursor()
-
-    # Prevent duplicate assignments
-    c.execute("""
-        SELECT id FROM champions_opportunities
-        WHERE champion_id = ? AND opportunity_id = ?
-    """, (champion_id, opportunity_id))
-
-    if c.fetchone():
-        conn.close()
-        return jsonify({"message": "Champion already assigned."})
-
-    c.execute("""
-        INSERT INTO champions_opportunities (champion_id, opportunity_id)
-        VALUES (?, ?)
-    """, (champion_id, opportunity_id))
-
-    conn.commit()
-    conn.close()
-
-    return jsonify({"message": "Champion assigned successfully."})
 
 
 if __name__ == "__main__":
