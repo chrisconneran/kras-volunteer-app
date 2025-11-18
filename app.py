@@ -298,7 +298,8 @@ def activate_email(token):
     session["email_verified"] = True
     session["verified_email"] = email
 
-    return render_template("activate.html", email=email)
+    return redirect("https://kras-volunteer-app.onrender.com/?verified=1")
+
 
 
 
