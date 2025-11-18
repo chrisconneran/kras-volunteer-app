@@ -14,7 +14,7 @@ app = Flask(__name__, static_folder="static", static_url_path="/static")
 app.secret_key = "supersecretkey"
 serializer = URLSafeTimedSerializer(app.secret_key)
 # Ensure uploads folder works on Render
-app.config["UPLOAD_FOLDER"] = "static/uploads"
+app.config["UPLOAD_FOLDER"] = "static"
 
 # Create the folder if it doesn't exist
 os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
