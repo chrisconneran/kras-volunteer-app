@@ -508,62 +508,60 @@
       // On first load: keep sections 2–3 visible but locked
       lockAllSections();
 
-      // If returning from email verification (?verified=1), unlock sections and restore data
+      // If returning from email verification (?verified=1), unlock sections and reload live data
       if (params.get("verified") === "1") {
         unlockAllSections();
+
+        let verifiedEmail = $("#check_email").val().trim().toLowerCase();
+        if (!verifiedEmail && storedVolunteer && storedVolunteer.email) {
+          verifiedEmail = storedVolunteer.email.toLowerCase();
+          $("#check_email").val(storedVolunteer.email);
+        }
+
+        if (verifiedEmail) {
+          $.get("/check", { email: verifiedEmail }, function(resp) {
+
+            storedVolunteer = resp;
+
+            // Step 1 identity fields (make read-only)
+            $("#check_email").val(resp.email || "").prop("readonly", true);
+            $("#check_first").val(resp.first_name || "").prop("readonly", true);
+            $("#check_last").val(resp.last_name || "").prop("readonly", true);
+            $("#check_phone").val(resp.phone || "").prop("readonly", true);
+
+            // Step 3 fields
+            $("#form_first").val(resp.first_name || "");
+            $("#form_last").val(resp.last_name || "");
+            $("#form_email").val(resp.email || "").prop("readonly", true);
+            $("#form_phone").val(resp.phone || "");
+
+            // Assignments table
+            const container = $("#assignmentsContainer");
+            const body = $("#assignmentsBody");
+            body.empty();
+
+            if (resp.assignments && resp.assignments.length > 0) {
+              resp.assignments.forEach(function(a) {
+                const row = "<tr>" +
+                              "<td>" + (a.submitted_at || "") + "</td>" +
+                              "<td>" + (a.title || "") + "</td>" +
+                              "<td>" + (a.time_commitment || "") + "</td>" +
+                              "<td>" + (a.duration || "") + "</td>" +
+                              "<td>" + (a.frequency || "") + "</td>" +
+                              "<td>" + (a.location || "") + "</td>" +
+                            "</tr>";
+                body.append(row);
+              });
+              container.removeClass("d-none");
+            } else {
+              container.addClass("d-none");
+            }
+          });
+        }
+
         $("#checkinMessage").html(
           "<span class='text-success fw-bold'>Email verified! You may now review opportunities, see your assignments, and submit your application.</span>"
         );
-        // Make Step 1 identity fields read-only so they remain visible but not editable
-        $("#check_email").prop("readonly", true);
-        $("#check_first").prop("readonly", true);
-        $("#check_last").prop("readonly", true);
-        $("#check_phone").prop("readonly", true);
-
-        // If we stored data from the original check, restore it
-        if (storedVolunteer) {
-          // Step 1
-          $("#check_email").val(storedVolunteer.email || "");
-          $("#check_first").val(storedVolunteer.first_name || "");
-          $("#check_last").val(storedVolunteer.last_name || "");
-          $("#check_phone").val(storedVolunteer.phone || "");
-
-          // Step 3 (application)
-          $("#form_first").val(storedVolunteer.first_name || "");
-          $("#form_last").val(storedVolunteer.last_name || "");
-          $("#form_email").val(storedVolunteer.email || "");
-          $("#form_phone").val(storedVolunteer.phone || "");
-
-          // Assignments grid
-          const container = $("#assignmentsContainer");
-          const body = $("#assignmentsBody");
-          body.empty();
-
-          if (storedVolunteer.assignments && storedVolunteer.assignments.length > 0) {
-            storedVolunteer.assignments.forEach(function(a) {
-              const date =
-                a.submitted_at || a.date_submitted || a.created_at || "";
-              const title = a.title || "";
-              const time = a.time || a.time_commitment || "";
-              const duration = a.duration || "";
-              const frequency = a.frequency || "";
-              const location = a.location || "";
-
-              const row = "<tr>" +
-                            "<td>" + date + "</td>" +
-                            "<td>" + title + "</td>" +
-                            "<td>" + time + "</td>" +
-                            "<td>" + duration + "</td>" +
-                            "<td>" + frequency + "</td>" +
-                            "<td>" + location + "</td>" +
-                          "</tr>";
-              body.append(row);
-            });
-            container.removeClass("d-none");
-          } else {
-            container.addClass("d-none");
-          }
-        }
       }
 
       // Populate opportunity form when "Apply Now" is clicked
