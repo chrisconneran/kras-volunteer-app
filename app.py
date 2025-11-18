@@ -315,32 +315,11 @@ def activate_email(token):
     if not email:
         return "Activation link is invalid or expired", 400
 
-    # Mark session as verified
     session["email_verified"] = True
     session["verified_email"] = email
 
-    # Auto-close window and refresh opener
-    return """
-    <html>
-    <body>
-        <p style='font-family:sans-serif; font-size:16px;'>
-            Your email is verified. You can close this window.
-        </p>
-
-        <script>
-            // If the main tab opened this activation link
-            if (window.opener) {
-                try {
-                    window.opener.location.href = "/?verified=1";
-                } catch (e) {}
-            }
-
-            // Close the tiny tab
-            window.close();
-        </script>
-    </body>
-    </html>
-    """
+    # Redirect user directly to main page like Google/Amazon
+    return redirect(url_for("index", verified=1))
 
 
 # --- HOME PAGE ---
