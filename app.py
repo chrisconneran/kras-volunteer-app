@@ -318,8 +318,19 @@ def activate_email(token):
     session["email_verified"] = True
     session["verified_email"] = email
 
-    return redirect(url_for("index", verified=1))
-
+    return """
+    <html>
+    <body>
+        <p>Email verified successfully. You may close this window.</p>
+        <script>
+            if (window.opener) {
+                try { window.opener.location.href = "/?verified=1"; } catch(e) {}
+            }
+            window.close();
+        </script>
+    </body>
+    </html>
+    """
 
 
 # --- HOME PAGE ---
