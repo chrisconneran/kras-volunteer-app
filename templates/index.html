@@ -686,37 +686,7 @@
 
 
 
-          // Assignments: only show after verification AND when assignments exist
-          const container = $("#assignmentsContainer");
-          const body = $("#assignmentsBody");
-          body.empty();
 
-          if (!resp.activation_message && resp.assignments && resp.assignments.length > 0) {
-            resp.assignments.forEach(function(a) {
-              const date =
-                a.submitted_at || a.date_submitted || a.created_at || "";
-              const title = a.title || "";
-              const time = a.time || a.time_commitment || "";
-              const duration = a.duration || "";
-              const frequency = a.frequency || "";
-              const location = a.location || "";
-
-              const row = "<tr>" +
-                            "<td>" + date + "</td>" +
-                            "<td>" + title + "</td>" +
-                            "<td>" + time + "</td>" +
-                            "<td>" + duration + "</td>" +
-                            "<td>" + frequency + "</td>" +
-                            "<td>" + location + "</td>" +
-                          "</tr>";
-              body.append(row);
-            });
-            container.removeClass("d-none");
-          } else {
-            container.addClass("d-none");
-          }
-        });
-      });
 
       // Auto-format phone numbers (xxx)xxx-xxxx for any .phone-mask inputs
       const phoneInputs = document.querySelectorAll('.phone-mask');
