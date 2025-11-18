@@ -320,17 +320,32 @@ def activate_email(token):
 
     return """
     <html>
-    <body>
-        <p>Email verified successfully. You may close this window.</p>
+      <body>
+        <p>Email verified successfully.</p>
+        <p>This window will redirect shortly.</p>
+
         <script>
-            if (window.opener) {
-                try { window.opener.location.href = "/?verified=1"; } catch(e) {}
-            }
-            window.close();
+          // If opened from the main volunteer page, refresh it
+          if (window.opener && !window.opener.closed) {
+              try {
+                  window.opener.location = "/?verified=1";
+              } catch(e) {}
+          }
+
+          // Always redirect THIS window too (backup behavior)
+          setTimeout(function() {
+              window.location = "/?verified=1";
+          }, 300);
+
+          // Try to close this tab if the browser allows it
+          setTimeout(function() {
+              try { window.close(); } catch(e) {}
+          }, 500);
         </script>
-    </body>
+      </body>
     </html>
     """
+
 
 
 # --- HOME PAGE ---
