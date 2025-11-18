@@ -6,26 +6,12 @@
   </head>
   <body style="font-family: Arial, sans-serif; padding: 20px; text-align: center;">
 
-    <h2>Email Verified</h2>
-    <p>You may close this window if it does not close automatically.</p>
+    <h2>Email Verified!</h2>
+    <p>Loading your volunteer portal...</p>
 
     <script>
-      // If this tab was opened from the volunteer portal
-      if (window.opener) {
-        try {
-          // Force the original tab to refresh with ?verified=1
-          const url = new URL(window.opener.location.href);
-          url.searchParams.set("verified", "1");
-          window.opener.location.href = url.toString();
-        } catch (e) {
-          console.error("Could not refresh opener:", e);
-        }
-      }
-
-      // Close this tab automatically
-      setTimeout(function() {
-        window.close();
-      }, 600);
+      // Redirect THIS tab to the main page with verified=1
+      window.location.href = "/?verified=1";
     </script>
 
   </body>
