@@ -622,7 +622,11 @@
         const last = $("#check_last").val().trim();
         const phone = $("#check_phone").val().trim();
 
-        $.get("/check", { email: email }, function(resp){
+       // Show instant feedback BEFORE waiting for server
+      $("#checkinMessage").html("<span class='text-primary'>Checking status... Email has been sent if needed.</span>");
+
+      $.get("/check", { email: email }, function(resp){
+
 
           // NEW — required so verified session loads in SAME tab
           if (resp.redirect) {

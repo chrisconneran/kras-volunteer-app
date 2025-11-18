@@ -318,33 +318,7 @@ def activate_email(token):
     session["email_verified"] = True
     session["verified_email"] = email
 
-    return """
-    <html>
-      <body>
-        <p>Email verified successfully.</p>
-        <p>This window will redirect shortly.</p>
-
-        <script>
-          // If opened from the main volunteer page, refresh it
-          if (window.opener && !window.opener.closed) {
-              try {
-                  window.opener.location = "/?verified=1";
-              } catch(e) {}
-          }
-
-          // Always redirect THIS window too (backup behavior)
-          setTimeout(function() {
-              window.location = "/?verified=1";
-          }, 300);
-
-          // Try to close this tab if the browser allows it
-          setTimeout(function() {
-              try { window.close(); } catch(e) {}
-          }, 500);
-        </script>
-      </body>
-    </html>
-    """
+    return redirect(url_for("index", verified=1))
 
 
 
