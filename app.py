@@ -46,8 +46,10 @@ def seed_opportunities():
     conn = get_db_connection()
     cur = conn.cursor()
 
-    cur.execute("SELECT COUNT(*) AS cnt FROM opportunities")
-    count = cur.fetchone()["cnt"]
+    cur.execute("SELECT COUNT(*) FROM opportunities")
+    result = cur.fetchone()
+    count = result[0] if result else 0
+
     if count == 0:
         sample_data = [
             (
@@ -90,14 +92,14 @@ def seed_opportunities():
                 """
                 INSERT INTO opportunities
                 (title, time, duration, mode, description, requirements, location, image, tags, closed)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, FALSE)
                 """,
                 (title, time_txt, duration, mode, desc, reqs, location, image, tags),
             )
 
         conn.commit()
-    conn.close()
 
+    conn.close()
 
 
 seed_opportunities()
