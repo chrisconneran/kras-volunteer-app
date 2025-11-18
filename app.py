@@ -756,6 +756,8 @@ def check_volunteer():
 
         if session_verified and session_email == email:
             response["activation_message"] = ""
+            response["redirect"] = "/?verified=1"
+
         else:
             send_activation_email(email)
             response[

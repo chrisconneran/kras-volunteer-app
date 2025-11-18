@@ -583,9 +583,16 @@
         $('html, body').animate({ scrollTop: $("#volunteerForm").offset().top - 60 }, 300);
       });
 
-      // Submit volunteer application
+        // Submit volunteer application
       $("#volunteerForm").on("submit", function(e) {
         e.preventDefault();
+
+        // If backend told us to redirect after verification, do it before submitting
+        const params = new URLSearchParams(window.location.search);
+        if (params.get("verified") !== "1") {
+          alert("Please verify your email before submitting the application.");
+          return;
+        }
 
         $.ajax({
           url: "/",
@@ -605,6 +612,7 @@
           }
         });
       });
+
 
       // Volunteer sign-in check
       $("#checkinForm").on("submit", function(e){
