@@ -297,7 +297,9 @@ def activate_email(token):
 
     session["email_verified"] = True
     session["verified_email"] = email
-    return redirect(url_for("index") + "?verified=1")
+
+    return render_template("activate.html", email=email)
+
 
 
 
