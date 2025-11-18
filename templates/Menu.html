@@ -123,7 +123,7 @@
         lockMenu();
       }
 
-      // Send admin verification request
+      // SEND ADMIN VERIFICATION REQUEST — INSTANT MESSAGE VERSION
       document.getElementById("adminSendBtn").addEventListener("click", function() {
         const email = document.getElementById("admin_email").value.trim().toLowerCase();
         const msgBox = document.getElementById("adminMessage");
@@ -133,6 +133,11 @@
           return;
         }
 
+        // Show INSTANT feedback (before server responds)
+        msgBox.innerHTML =
+          "<span style='color:#2563eb; font-weight:600;'>Sending login link… check your inbox.</span>";
+
+        // Send request in background
         fetch("/admin_request_access", {
           method: "POST",
           headers: { "Content-Type": "application/json" },

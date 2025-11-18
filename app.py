@@ -477,22 +477,14 @@ def admin_activate(token):
     if not email or not email.endswith("@kraskickers.org"):
         return "Invalid or expired admin activation link.", 400
 
+    # Mark admin as verified
     session["admin_verified"] = True
     session.permanent = True
 
-    return """
-    <html>
-    <body>
-        <p>Admin verified successfully. You may close this window.</p>
-        <script>
-            if (window.opener) {
-                try { window.opener.location.href = "/menu?admin_verified=1"; } catch(e) {}
-            }
-            window.close();
-        </script>
-    </body>
-    </html>
-    """
+    # Instead of trying to close a tab (which fails on many browsers),
+    # redirect directly back to Menu with the flag.
+    return redirect(url_for("menu", admin_verified=1))
+
 
 
 
