@@ -417,53 +417,6 @@ def manage():
 
     return render_template("manage.html", opportunities=opportunities)
 
-@app.route("/api/champions")
-def get_champions():
-    conn = get_db_connection()
-    champions = conn.execute(
-        "SELECT id, first_name, last_name, email FROM applications WHERE is_champion = 1 ORDER BY first_name"
-    ).fetchall()
-    conn.close()
-    return jsonify([dict(row) for row in champions])
-
-@app.route("/assign_champion", methods=["POST"])
-def assign_champion():
-    if not session.get("admin_verified"):
-        return jsonify({"error": "Not authorized"}), 403
-
-    data = request.json
-    champion_id = data.get("champion_id")
-    opportunity_id = data.get("opportunity_id")
-
-    if not champion_id or not opportunity_id:
-        return jsonify({"error": "Missing data"}), 400
-
-    conn = get_db_connection()
-    conn.execute(
-        "INSERT INTO champions_opportunities (champion_id, opportunity_id) VALUES (?, ?)",
-        (champion_id, opportunity_id)
-    )
-    conn.commit()
-    conn.close()
-
-    return jsonify({"message": "Champion assigned successfully"})
-
-@app.route("/api/opportunity_champions/<int:opp_id>")
-def get_opportunity_champions(opp_id):
-    conn = get_db_connection()
-    rows = conn.execute(
-        """
-        SELECT c.id, a.first_name, a.last_name, a.email
-        FROM champions_opportunities c
-        JOIN applications a ON c.champion_id = a.id
-        WHERE c.opportunity_id = ?
-        """,
-        (opp_id,)
-    ).fetchall()
-    conn.close()
-    return jsonify([dict(row) for row in rows])
-
-
 
 # --- Add Opportunity ---
 @app.route("/add", methods=["POST"])
@@ -1101,70 +1054,6 @@ def add_note(app_id):
     conn.close()
 
     return jsonify({"message": "Note added successfully."})
-@app.route("/api/champions")
-def api_champions():
-    conn = get_db()
-    c = conn.cursor()
-
-    # Fetch volunteers who applied to the "Champion" opportunity AND were approved
-    c.execute("""
-        SELECT id, first_name, last_name, email
-        FROM volunteers
-        WHERE applied_for = 'Champion'
-        AND status = 'Approved'
-    """)
-
-    rows = c.fetchall()
-    conn.close()
-
-    return jsonify([dict(row) for row in rows])
-
-@app.route("/api/opportunity_champions/<int:opp_id>")
-def api_opportunity_champions(opp_id):
-    conn = get_db()
-    c = conn.cursor()
-
-    c.execute("""
-        SELECT v.id, v.first_name, v.last_name, v.email
-        FROM champions_opportunities co
-        JOIN volunteers v ON co.champion_id = v.id
-        WHERE co.opportunity_id = ?
-    """, (opp_id,))
-
-    rows = c.fetchall()
-    conn.close()
-
-    return jsonify([dict(row) for row in rows])
-@app.route("/api/assign_champion", methods=["POST"])
-def api_assign_champion():
-    champion_id = request.form.get("champion_id")
-    opportunity_id = request.form.get("opportunity_id")
-
-    if not champion_id or not opportunity_id:
-        return jsonify({"error": "Missing data"}), 400
-
-    conn = get_db()
-    c = conn.cursor()
-
-    # Prevent duplicate assignments
-    c.execute("""
-        SELECT id FROM champions_opportunities
-        WHERE champion_id = ? AND opportunity_id = ?
-    """, (champion_id, opportunity_id))
-
-    if c.fetchone():
-        conn.close()
-        return jsonify({"message": "Champion already assigned."})
-
-    c.execute("""
-        INSERT INTO champions_opportunities (champion_id, opportunity_id)
-        VALUES (?, ?)
-    """, (champion_id, opportunity_id))
-
-    conn.commit()
-    conn.close()
-
-    return jsonify({"message": "Champion assigned successfully."})
 
 
 if __name__ == "__main__":

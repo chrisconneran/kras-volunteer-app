@@ -334,6 +334,26 @@
                   <button class="btn btn-outline-success btn-sm close-btn" data-id="{{ opp.id }}">Close</button>
                 </div>
               </div>
+              <!-- ⭐ CHAMPION ASSIGNMENT UI ⭐ -->
+              <div class="mt-3 p-2 border rounded bg-light">
+                <label class="fw-semibold small">Assign a Champion</label>
+
+                <select class="form-select form-select-sm championSelect"
+                        data-opportunity-id="{{ opp.id }}">
+                  <option value="">Select a Champion...</option>
+                </select>
+
+                <button class="btn btn-primary btn-sm mt-2 assignChampionBtn"
+                        data-opportunity-id="{{ opp.id }}">
+                  Assign Champion
+                </button>
+
+                <div class="assignedChampions mt-2 small"
+                    data-opportunity-id="{{ opp.id }}">
+                  Loading assigned champions...
+                </div>
+              </div>
+              <!-- ⭐ END CHAMPION UI ⭐ -->
             </div>
           </div>
           {% endfor %}
@@ -573,6 +593,79 @@
         const id = $(this).data("id");
         $.post(`/reopen_opportunity/${id}`, resp => { alert(resp.message); location.reload(); });
       });
+      
+      //------------------------------------------------------------
+      //  CHAMPIONS: LOAD LIST OF APPROVED CHAMPIONS
+      //------------------------------------------------------------
+      function loadChampionList() {
+        $.get("/api/champions", function(champions) {
+          $(".championSelect").each(function() {
+            const select = $(this);
+            const oppId = select.data("opportunity-id");
+
+            select.empty();
+            select.append(`<option value="">Select a Champion...</option>`);
+
+            champions.forEach(c => {
+              select.append(
+                `<option value="${c.id}">${c.first_name} ${c.last_name} (${c.email})</option>`
+              );
+            });
+          });
+        });
+      }
+
+      //------------------------------------------------------------
+      //  LOAD CHAMPIONS ALREADY ASSIGNED TO EACH OPPORTUNITY
+      //------------------------------------------------------------
+      function loadAssignedChampions() {
+        $(".assignedChampions").each(function() {
+          const container = $(this);
+          const oppId = container.data("opportunity-id");
+
+          $.get("/api/opportunity_champions/" + oppId, function(list) {
+            if (list.length === 0) {
+              container.html("<span class='text-muted'>No champions assigned.</span>");
+              return;
+            }
+
+            let html = "";
+            list.forEach(c => {
+              html += `<div>
+                         <b>${c.first_name} ${c.last_name}</b>
+                         <span class="text-muted">(${c.email})</span>
+                       </div>`;
+            });
+            container.html(html);
+          });
+        });
+      }
+
+      //------------------------------------------------------------
+      //  ASSIGN CHAMPION TO OPPORTUNITY
+      //------------------------------------------------------------
+      $(".assignChampionBtn").click(function() {
+        const oppId = $(this).data("opportunity-id");
+        const selectElem = $(`.championSelect[data-opportunity-id='${oppId}']`);
+        const championId = selectElem.val();
+
+        if (!championId) {
+          alert("Please select a champion first.");
+          return;
+        }
+
+        $.post("/api/assign_champion", {
+          champion_id: championId,
+          opportunity_id: oppId
+        }, function(resp) {
+          alert(resp.message);
+          loadAssignedChampions();
+        });
+      });
+
+      loadChampionList();
+      loadAssignedChampions();
+      
     </script>
   </body>
 </html>
