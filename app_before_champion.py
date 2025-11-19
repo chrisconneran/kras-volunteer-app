@@ -59,77 +59,6 @@ def dictify_rows(rows):
     return result
 
 
-
-
-
-def current_user_email() -> str | None:
-    """
-    Return the currently verified email in the session, lowercased.
-    """
-    email = session.get("verified_email")
-    if not email:
-        return None
-    return str(email).strip().lower()
-
-
-def user_is_champion_for_opportunity(opportunity_id: int) -> bool:
-    """
-    Return True if the logged in user is a champion for the given opportunity.
-    """
-    email = current_user_email()
-    if not email:
-        return False
-
-    with get_db_connection() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                """
-                SELECT 1
-                FROM champions_opportunities co
-                JOIN applications a ON co.champion_id = a.id
-                WHERE co.opportunity_id = %s
-                  AND LOWER(a.email) = %s
-                LIMIT 1
-                """,
-                (opportunity_id, email),
-            )
-            row = cur.fetchone()
-            return row is not None
-
-
-def user_can_manage_opportunity(opportunity_id: int) -> bool:
-    """
-    Admins can manage every opportunity.
-    Champions can manage only the opportunities they are assigned to.
-    """
-    if session.get("admin_verified"):
-        return True
-    return user_is_champion_for_opportunity(opportunity_id)
-
-
-def get_opportunity_id_for_application(app_id: int) -> int | None:
-    """
-    Given an application id, find the related opportunity id by matching title.
-    Returns None if no matching opportunity is found.
-    """
-    with get_db_connection() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                """
-                SELECT o.id
-                FROM applications a
-                LEFT JOIN opportunities o ON o.title = a.title
-                WHERE a.id = %s
-                """,
-                (app_id,),
-            )
-            row = cur.fetchone()
-            if not row:
-                return None
-            opp_id = row[0]
-            return opp_id
-
-
 def require_admin():
     """
     Simple guard used at the top of admin-only routes.
@@ -477,63 +406,46 @@ def index():
         verified_email = (session.get("verified_email") or "").strip().lower()
 
         if not session.get("email_verified"):
-            return jsonify({
-                "status": "error",
-                "message": "Please verify your email before submitting the application."
-            }), 400
+            return (
+                jsonify(
+                    {
+                        "status": "error",
+                        "message": "Please verify your email before submitting the application.",
+                    }
+                ),
+                400,
+            )
 
         if form_email != verified_email:
-            return jsonify({
-                "status": "error",
-                "message": "The email used in the application does not match the verified email."
-            }), 400
+            return (
+                jsonify(
+                    {
+                        "status": "error",
+                        "message": "The email used in the application does not match the verified email.",
+                    }
+                ),
+                400,
+            )
 
         app_id = save_application(request.form.to_dict())
-        return jsonify({
-            "status": "success",
-            "title": request.form.get("title"),
-            "message": "Thank you. Your volunteer application has been submitted.",
-            "application_id": app_id
-        })
-
-    verified_email = (session.get("verified_email") or "").strip().lower()
+        return jsonify(
+            {
+                "status": "success",
+                "title": request.form.get("title"),
+                "message": "Thank you. Your volunteer application has been submitted.",
+                "application_id": app_id,
+            }
+        )
 
     with get_db_connection() as conn:
         with conn.cursor() as cur:
-
-            # Load all open opportunities
             cur.execute(
                 "SELECT * FROM opportunities WHERE closed IS FALSE OR closed IS NULL"
             )
             rows = cur.fetchall()
-            opportunities = dictify_rows(rows)
 
-            # Load user's volunteer application history / assignments
-            cur.execute(
-                """
-                SELECT id, title, timestamp, time, duration, mode, location, status
-                FROM applications
-                WHERE email = %s
-                ORDER BY timestamp DESC
-                """,
-                (verified_email,)
-            )
-            my_assignments = dictify_rows(cur.fetchall())
+    opportunities = dictify_rows(rows)
 
-            # Load opportunities the user champions
-            cur.execute(
-                """
-                SELECT o.*
-                FROM champion_assignments c
-                JOIN opportunities o ON c.opportunity_id = o.id
-                WHERE c.champion_email = %s
-                ORDER BY o.id
-                """,
-                (verified_email,)
-            )
-            champion_opps = dictify_rows(cur.fetchall())
-
-    # Normalize tags and frequency for ALL opportunities
     for opp in opportunities:
         tags_raw = opp.get("tags")
         if isinstance(tags_raw, str) and tags_raw.strip():
@@ -549,28 +461,8 @@ def index():
 
         opp["frequency"] = opp.get("mode", "")
 
-    # Normalize tags for champion opportunities
-    for opp in champion_opps:
-        tags_raw = opp.get("tags")
-        if isinstance(tags_raw, str) and tags_raw.strip():
-            try:
-                opp["tags"] = json.loads(tags_raw)
-            except json.JSONDecodeError:
-                opp["tags"] = []
-        elif tags_raw is None:
-            opp["tags"] = []
+    return render_template("index.html", opportunities=opportunities)
 
-        if "description" in opp and "desc" not in opp:
-            opp["desc"] = opp["description"]
-
-        opp["frequency"] = opp.get("mode", "")
-
-    return render_template(
-        "index.html",
-        opportunities=opportunities,
-        my_assignments=my_assignments,
-        champion_opps=champion_opps
-    )
 
 # =====
 # Admin menu
@@ -935,99 +827,45 @@ def closed_opportunities():
 # =====
 @app.route("/applicants/<int:opp_id>")
 def view_applicants(opp_id):
-    """
-    View applicants for an opportunity.
-
-    Admins:
-        - can open for any opportunity
-        - see admin view
-
-    Champions:
-        - can open only opportunities they are assigned to
-        - share the same screen, but template can hide admin-only controls
-    """
-    # Permission check: admin or champion for this opportunity
-    if not user_can_manage_opportunity(opp_id):
-        # If not allowed, just send them to the main volunteer page
-        return redirect(url_for("index"))
+    auth = require_admin()
+    if auth:
+        return auth
 
     with get_db_connection() as conn:
         with conn.cursor() as cur:
-            cur.execute(
-                "SELECT id, title, time, duration, mode, description, requirements, "
-                "location, image, tags, closed, closed_date "
-                "FROM opportunities WHERE id = %s",
-                (opp_id,),
-            )
-            row = cur.fetchone()
-
-            if not row:
+            cur.execute("SELECT * FROM opportunities WHERE id = %s", (opp_id,))
+            opp_row = cur.fetchone()
+            if opp_row is None:
                 return "Opportunity not found", 404
 
-            # Convert opportunity row to dict
-            opp_cols = [
-                "id",
-                "title",
-                "time",
-                "duration",
-                "mode",
-                "description",
-                "requirements",
-                "location",
-                "image",
-                "tags",
-                "closed",
-                "closed_date",
-            ]
-            opportunity = dict(zip(opp_cols, row))
-
-            # Normalize tags
-            tags_raw = opportunity.get("tags")
-            if isinstance(tags_raw, str) and tags_raw.strip():
-                try:
-                    opportunity["tags"] = json.loads(tags_raw)
-                except json.JSONDecodeError:
-                    opportunity["tags"] = []
-            elif tags_raw is None:
-                opportunity["tags"] = []
-            opportunity["frequency"] = opportunity.get("mode", "")
-
-            # Fetch applicants for this opportunity by matching title
+            title = opp_row["title"]
             cur.execute(
                 """
-                SELECT id, first_name, last_name, email, phone, contact,
-                       title, time, duration, mode, location,
-                       comments, status, timestamp, history, notes
-                FROM applications
+                SELECT * FROM applications
                 WHERE title = %s
                 ORDER BY timestamp DESC
                 """,
-                (opportunity["title"],),
+                (title,),
             )
-            rows = cur.fetchall()
+            applicants_rows = cur.fetchall()
 
-    applicants = []
-    for r in rows:
-        cols = [
-            "id",
-            "first_name",
-            "last_name",
-            "email",
-            "phone",
-            "contact",
-            "title",
-            "time",
-            "duration",
-            "mode",
-            "location",
-            "comments",
-            "status",
-            "timestamp",
-            "history",
-            "notes",
-        ]
-        app_entry = dict(zip(cols, r))
+    opportunity = dict(opp_row)
+    tags_raw = opportunity.get("tags")
+    if isinstance(tags_raw, str) and tags_raw.strip():
+        try:
+            opportunity["tags"] = json.loads(tags_raw)
+        except json.JSONDecodeError:
+            opportunity["tags"] = []
+    elif tags_raw is None:
+        opportunity["tags"] = []
 
+    if "description" in opportunity and "desc" not in opportunity:
+        opportunity["desc"] = opportunity["description"]
+
+    opportunity["frequency"] = opportunity.get("mode", "")
+
+    applicants = dictify_rows(applicants_rows)
+    for app_entry in applicants:
         history_raw = app_entry.get("history")
         if isinstance(history_raw, str) and history_raw.strip():
             try:
@@ -1046,22 +884,10 @@ def view_applicants(opp_id):
         else:
             app_entry["notes"] = []
 
-        applicants.append(app_entry)
-
-    # Back button behavior:
-    # - Admins go back to the admin menu
-    # - Champions go back to the main volunteer page
-    back_to_menu_url = (
-        url_for("menu") if session.get("admin_verified") else url_for("index")
-    )
-    is_champion_view = not session.get("admin_verified")
-
     return render_template(
         "applicants.html",
         opportunity=opportunity,
         applicants=applicants,
-        back_to_menu_url=back_to_menu_url,
-        champion_mode=is_champion_view,
     )
 
 
@@ -1083,7 +909,6 @@ def check_volunteer():
         "phone": "",
         "assignments": [],
         "activation_message": "",
-        "champion_assignments": [],
     }
 
     with get_db_connection() as conn:
@@ -1158,27 +983,6 @@ def check_volunteer():
                 response[
                     "activation_message"
                 ] = "We just sent a verification email. Please click the link in that email so you can submit your application."
-    # Load champion assignments for this email
-    with get_db_connection() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                """
-                SELECT o.id AS opp_id, o.title
-                FROM champions_opportunities co
-                JOIN applications a ON co.champion_id = a.id
-                JOIN opportunities o ON co.opportunity_id = o.id
-                WHERE LOWER(a.email) = %s
-                ORDER BY o.title
-                """,
-                (email,),
-            )
-            rows = cur.fetchall()
-
-    champions = []
-    for r in rows:
-        champions.append({"opp_id": r.get("opp_id"), "title": r.get("title")})
-
-    response["champion_assignments"] = champions
 
     return jsonify(response)
 
@@ -1223,27 +1027,9 @@ def review():
 
 @app.route("/update_status/<int:app_id>", methods=["POST"])
 def update_status(app_id):
-    """
-    Update the status of an application.
-
-    Admins:
-        - can update any application
-
-    Champions:
-        - can update only applications for opportunities they champion
-    """
-    # Figure out which opportunity this application belongs to
-    opp_id = get_opportunity_id_for_application(app_id)
-
-    # Permission check
-    can_manage = False
-    if session.get("admin_verified"):
-        can_manage = True
-    elif opp_id is not None and user_is_champion_for_opportunity(opp_id):
-        can_manage = True
-
-    if not can_manage:
-        return jsonify({"error": "Not authorized"}), 403
+    auth = require_admin()
+    if auth:
+        return auth
 
     new_status = request.form.get("status", "Pending")
     ts = datetime.now().strftime("%Y-%m-%d %H:%M")
@@ -1258,7 +1044,7 @@ def update_status(app_id):
             if not row:
                 return jsonify({"error": "Application not found"}), 404
 
-            history_raw = row[0] or "[]"
+            history_raw = row.get("history") or "[]"
             try:
                 history_list = json.loads(history_raw)
             except json.JSONDecodeError:
@@ -1279,10 +1065,8 @@ def update_status(app_id):
                 """,
                 (new_status, json.dumps(history_list), app_id),
             )
-            conn.commit()
 
     return jsonify({"message": "Status updated successfully"})
-
 
 
 @app.route("/delete_application/<int:app_id>", methods=["POST"])
@@ -1341,64 +1125,18 @@ def volunteers():
 # =====
 @app.route("/volunteer/<int:app_id>")
 def volunteer_detail(app_id):
-    """
-    Volunteer detail and assignment screen.
-
-    Admins:
-        - can open for any application
-    Champions:
-        - can open only if they are champion for the related opportunity
-        - cannot delete applications (delete route still admin-only)
-    """
-    # Determine the opportunity id related to this application
-    opp_id = get_opportunity_id_for_application(app_id)
-
-    # Permission check
-    can_manage = False
-    if session.get("admin_verified"):
-        can_manage = True
-    elif opp_id is not None and user_is_champion_for_opportunity(opp_id):
-        can_manage = True
-
-    if not can_manage:
-        return redirect(url_for("index"))
+    auth = require_admin()
+    if auth:
+        return auth
 
     with get_db_connection() as conn:
         with conn.cursor() as cur:
-            cur.execute(
-                """
-                SELECT id, first_name, last_name, email, phone, contact,
-                       title, time, duration, mode, location,
-                       comments, status, timestamp, history, notes
-                FROM applications
-                WHERE id = %s
-                """,
-                (app_id,),
-            )
+            cur.execute("SELECT * FROM applications WHERE id = %s", (app_id,))
             row = cur.fetchone()
-
             if not row:
                 return "Application not found", 404
 
-            cols = [
-                "id",
-                "first_name",
-                "last_name",
-                "email",
-                "phone",
-                "contact",
-                "title",
-                "time",
-                "duration",
-                "mode",
-                "location",
-                "comments",
-                "status",
-                "timestamp",
-                "history",
-                "notes",
-            ]
-            app_entry = dict(zip(cols, row))
+            app_entry = dict(row)
 
             history_raw = app_entry.get("history")
             if isinstance(history_raw, str) and history_raw.strip():
@@ -1418,26 +1156,17 @@ def volunteer_detail(app_id):
             else:
                 app_entry["notes"] = []
 
-            # Try to look up the opportunity id again by title, in case it was missing
-            if opp_id is None:
-                cur.execute(
-                    "SELECT id FROM opportunities WHERE title = %s",
-                    (app_entry.get("title", ""),),
-                )
-                row2 = cur.fetchone()
-                if row2:
-                    opp_id = row2[0]
-
-    back_opp_id = opp_id
-    is_champion_view = not session.get("admin_verified")
-    allow_delete = bool(session.get("admin_verified"))
+            cur.execute(
+                "SELECT id FROM opportunities WHERE title = %s",
+                (app_entry.get("title", ""),),
+            )
+            opp_row = cur.fetchone()
+            back_opp_id = opp_row["id"] if opp_row else None
 
     return render_template(
         "review_detail.html",
         app=app_entry,
         back_opp_id=back_opp_id,
-        champion_mode=is_champion_view,
-        allow_delete=allow_delete,
     )
 
 
@@ -1446,31 +1175,13 @@ def volunteer_detail(app_id):
 # =====
 @app.route("/add_note/<int:app_id>", methods=["POST"])
 def add_note(app_id):
-    """
-    Add an admin or champion note to an application.
+    auth = require_admin()
+    if auth:
+        return auth
 
-    Admins:
-        - can add notes for any application
-
-    Champions:
-        - can add notes only for applications for opportunities they champion
-    """
     note_text = (request.form.get("note") or "").strip()
     if not note_text:
         return jsonify({"error": "Note cannot be empty."}), 400
-
-    # Determine related opportunity
-    opp_id = get_opportunity_id_for_application(app_id)
-
-    # Permission check
-    can_manage = False
-    if session.get("admin_verified"):
-        can_manage = True
-    elif opp_id is not None and user_is_champion_for_opportunity(opp_id):
-        can_manage = True
-
-    if not can_manage:
-        return jsonify({"error": "Not authorized"}), 403
 
     ts = datetime.now().strftime("%Y-%m-%d %H:%M")
 
@@ -1484,8 +1195,8 @@ def add_note(app_id):
             if not row:
                 return jsonify({"error": "Application not found"}), 404
 
-            history_raw = row[0] or "[]"
-            notes_raw = row[1] or "[]"
+            history_raw = row.get("history") or "[]"
+            notes_raw = row.get("notes") or "[]"
 
             try:
                 history_list = json.loads(history_raw)
@@ -1505,7 +1216,7 @@ def add_note(app_id):
 
             history_list.append(
                 {
-                    "event": "Admin or champion note added",
+                    "event": "Admin note added",
                     "timestamp": ts,
                 }
             )
@@ -1518,10 +1229,8 @@ def add_note(app_id):
                 """,
                 (json.dumps(notes_list), json.dumps(history_list), app_id),
             )
-            conn.commit()
 
     return jsonify({"message": "Note added successfully."})
-
 
 
 # =====

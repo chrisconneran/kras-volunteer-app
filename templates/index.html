@@ -334,6 +334,25 @@
         </div>
       </div>
 
+      <!-- Champion Assignments Section -->
+      <div id="championAssignmentsContainer" class="volunteer-assignments d-none mt-2">
+        <div class="fw-semibold px-2 pt-1">
+          Opportunities You Champion
+        </div>
+        <table class="table table-sm mb-0">
+          <thead>
+            <tr>
+              <th>Opportunity</th>
+              <th>Manage</th>
+            </tr>
+          </thead>
+          <tbody id="championAssignmentsBody">
+            <!-- rows inserted by JavaScript -->
+          </tbody>
+        </table>
+      </div>
+
+
       <!-- ROW 2: Volunteer Application (left) + Opportunities (right) -->
       <div id="lockedSections" class="row gx-2 gy-2">
         <!-- Left: Application -->
@@ -550,8 +569,8 @@
                   const row = "<tr>" +
                                 "<td>" + (a.submitted_at || "") + "</td>" +
                                 "<td>" + (a.title || "") + "</td>" +
-                                "<td>" + (a.time_commitment || "") + "</td>" +
-                                "<td>" + (a.duration || "") + "</td>" +
+                                  "<td>" + (a.time_commitment || "") + "</td>" +
+                                  "<td>" + (a.duration || "") + "</td>" +
                                 "<td>" + (a.frequency || "") + "</td>" +
                                 "<td>" + (a.location || "") + "</td>" +
                               "</tr>";
@@ -560,6 +579,25 @@
                 container.removeClass("d-none");
               } else {
                 container.addClass("d-none");
+              }
+              /* Champion assignment rendering */
+              if (resp.champion_assignments && resp.champion_assignments.length > 0) {
+                const champContainer = $("#championAssignmentsContainer");
+                const champBody = $("#championAssignmentsBody");
+                champBody.empty();
+
+                resp.champion_assignments.forEach(function(c) {
+                  const row =
+                    "<tr>" +
+                      "<td>" + c.title + "</td>" +
+                      "<td><a href=\"/applicants/" + c.opp_id + "\" class=\"btn btn-outline-primary btn-sm\">Open</a></td>" +
+                    "</tr>";
+                  champBody.append(row);
+                });
+
+                champContainer.removeClass("d-none");
+              } else {
+                $("#championAssignmentsContainer").addClass("d-none");
               }
             });
           }

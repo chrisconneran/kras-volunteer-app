@@ -91,17 +91,15 @@
         <div class="d-flex flex-column flex-sm-row gap-2">
           <a
             id="backButton"
-            href="{% if back_opp_id %}
-                     {{ url_for('view_applicants', opp_id=back_opp_id) }}
-                   {% else %}
-                     {{ url_for('volunteers') }}
-                   {% endif %}"
+            href="{{ back_to_menu_url }}"
             class="btn btn-outline-primary btn-sm">
             Back to View Applications
           </a>
+          {% if allow_delete %}
           <button id="deleteButton" class="btn btn-outline-danger btn-sm">
             Delete Application
           </button>
+          {% endif %}
         </div>
       </div>
 
