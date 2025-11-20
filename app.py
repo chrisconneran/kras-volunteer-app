@@ -1025,18 +1025,19 @@ def view_applicants(opp_id):
             opportunity["frequency"] = opportunity.get("mode", "")
 
             # Fetch applicants allow fuzzy title matching (handles extra spaces & casing)
+        # Fetch applicants: proper fuzzy title match (case + trim)
             cur.execute(
                 """
                 SELECT id, first_name, last_name, email, phone, contact,
                     title, time, duration, mode, location,
                     comments, status, timestamp, history, notes
                 FROM applications
-                WHERE REPLACE(REPLACE(LOWER(title), ' ', ' '), '  ', ' ') =
-                REPLACE(REPLACE(LOWER(%s), ' ', ' '), '  ', ' ')
+                WHERE LOWER(TRIM(title)) = LOWER(TRIM(%s))
                 ORDER BY timestamp DESC
                 """,
                 (opportunity["title"],),
             )
+
             rows = cur.fetchall()
 
     applicants = []
