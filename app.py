@@ -1022,14 +1022,14 @@ def view_applicants(opp_id):
                 opportunity["tags"] = []
             opportunity["frequency"] = opportunity.get("mode", "")
 
-            # Fetch applicants for this opportunity by matching title
+            # Fetch applicants allow fuzzy title matching (handles extra spaces & casing)
             cur.execute(
                 """
                 SELECT id, first_name, last_name, email, phone, contact,
-                       title, time, duration, mode, location,
-                       comments, status, timestamp, history, notes
+                    title, time, duration, mode, location,
+                    comments, status, timestamp, history, notes
                 FROM applications
-                WHERE title = %s
+                WHERE LOWER(TRIM(title)) = LOWER(TRIM(%s))
                 ORDER BY timestamp DESC
                 """,
                 (opportunity["title"],),
