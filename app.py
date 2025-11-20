@@ -1153,7 +1153,7 @@ def check_volunteer():
                             ON a.title = o.title
                         WHERE
                             LOWER(a.email) = %s
-                            AND a.status = 'Assigned'
+                           AND a.status IN ('Assigned', 'Pending')
                         ORDER BY a.timestamp DESC
                         """,
                         (email,),
