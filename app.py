@@ -1166,6 +1166,7 @@ def check_volunteer():
                             {
                                 "submitted_at": row.get("submitted_at"),
                                 "title": row.get("title"),
+                                "status": row.get("status"), 
                                 "time_commitment": row.get("time_commitment"),
                                 "duration": row.get("duration"),
                                 "frequency": row.get("frequency"),
