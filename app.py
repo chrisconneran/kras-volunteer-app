@@ -548,13 +548,15 @@ def index():
                 cur.execute(
                     """
                     SELECT o.*
-                    FROM champion_assignments c
-                    JOIN opportunities o ON c.opportunity_id = o.id
-                    WHERE c.champion_email = %s
+                    FROM champions_opportunities co
+                    JOIN applications a ON co.champion_id = a.id
+                    JOIN opportunities o ON co.opportunity_id = o.id
+                    WHERE LOWER(a.email) = %s
                     ORDER BY o.id
                     """,
                     (verified_email,)
                 )
+
                 champion_opps = dictify_rows(cur.fetchall())
 
 
@@ -1029,7 +1031,8 @@ def view_applicants(opp_id):
                     title, time, duration, mode, location,
                     comments, status, timestamp, history, notes
                 FROM applications
-                WHERE LOWER(TRIM(title)) = LOWER(TRIM(%s))
+                WHERE REPLACE(REPLACE(LOWER(title), ' ', ' '), '  ', ' ') =
+                REPLACE(REPLACE(LOWER(%s), ' ', ' '), '  ', ' ')
                 ORDER BY timestamp DESC
                 """,
                 (opportunity["title"],),
