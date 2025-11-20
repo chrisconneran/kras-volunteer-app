@@ -25,6 +25,9 @@ app.permanent_session_lifetime = timedelta(minutes=30)
 app.config["UPLOAD_FOLDER"] = "static"
 os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
 
+def is_admin(email):
+    return email in {"chris@kraskickers.org"}
+
 
 # =====
 # Database helpers (Postgres via psycopg)
@@ -520,18 +523,34 @@ def index():
             )
             my_assignments = dictify_rows(cur.fetchall())
 
-            # Load opportunities the user champions
-            cur.execute(
-                """
-                SELECT o.*
-                FROM champion_assignments c
-                JOIN opportunities o ON c.opportunity_id = o.id
-                WHERE c.champion_email = %s
-                ORDER BY o.id
-                """,
-                (verified_email,)
-            )
-            champion_opps = dictify_rows(cur.fetchall())
+            # Keep only Assigned or Pending
+            my_assignments = [
+                a for a in my_assignments 
+                if a.get("status") in ("Assigned", "Pending")
+            ]
+
+            # Sort: Assigned first, Pending second
+            status_order = {"Assigned": 0, "Pending": 1}
+            my_assignments.sort(key=lambda a: status_order.get(a.get("status"), 2))
+
+            # Determine champion or admin view
+            if is_admin(verified_email):
+                # Admin sees all opportunities as champion_opps
+                champion_opps = opportunities.copy()
+            else:
+                # Normal champion-only filter
+                cur.execute(
+                    """
+                    SELECT o.*
+                    FROM champion_assignments c
+                    JOIN opportunities o ON c.opportunity_id = o.id
+                    WHERE c.champion_email = %s
+                    ORDER BY o.id
+                    """,
+                    (verified_email,)
+                )
+                champion_opps = dictify_rows(cur.fetchall())
+
 
     # Normalize tags and frequency for ALL opportunities
     for opp in opportunities:
@@ -1247,6 +1266,19 @@ def update_status(app_id):
 
     new_status = request.form.get("status", "Pending")
     ts = datetime.now().strftime("%Y-%m-%d %H:%M")
+
+    # Allow new status types
+    allowed_statuses = {
+        "Pending",
+        "Assigned",
+        "Closed-Completed",
+        "Closed-Not Assigned"
+    }
+
+# Protect against invalid data coming from the form
+if new_status not in allowed_statuses:
+    new_status = "Pending"
+
 
     with get_db_connection() as conn:
         with conn.cursor() as cur:

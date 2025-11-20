@@ -127,7 +127,8 @@
         <select id="statusSelect" class="form-select form-select-sm w-auto">
           <option value="Pending" {{ "selected" if app.status == "Pending" }}>Pending</option>
           <option value="Assigned" {{ "selected" if app.status == "Assigned" }}>Assigned</option>
-          <option value="Completed" {{ "selected" if app.status == "Completed" }}>Completed</option>
+          <option value="Closed-Completed" {{ "selected" if app.status == "Closed-Completed" }}>Closed-Completed</option>
+          <option value="Closed-Not Assigned" {{ "selected" if app.status == "Closed-Not Assigned" }}>Closed-Not Assigned</option>
         </select>
         <a href="mailto:{{ app.email }}" class="btn btn-outline-primary btn-sm ms-auto">Email</a>
       </div>
