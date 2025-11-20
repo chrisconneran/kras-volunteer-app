@@ -334,6 +334,14 @@
         </div>
       </div>
 
+      {% if champion_opps|length > 0 %}
+      <div class="mt-2 mb-2">
+        <a href="#championAssignmentsContainer" class="btn btn-primary btn-sm">
+          Manage My Opportunities
+        </a>
+      </div>
+      {% endif %}
+      
       <!-- Champion Assignments Section -->
       <div id="championAssignmentsContainer" class="volunteer-assignments d-none mt-2">
         <div class="fw-semibold px-2 pt-1">
@@ -569,8 +577,9 @@
                   const row = "<tr>" +
                                 "<td>" + (a.submitted_at || "") + "</td>" +
                                 "<td>" + (a.title || "") + "</td>" +
-                                  "<td>" + (a.time_commitment || "") + "</td>" +
-                                  "<td>" + (a.duration || "") + "</td>" +
+                                "<td>" + (a.status || "") + "</td>" +
+                                "<td>" + (a.time_commitment || "") + "</td>" +
+                                "<td>" + (a.duration || "") + "</td>" +
                                 "<td>" + (a.frequency || "") + "</td>" +
                                 "<td>" + (a.location || "") + "</td>" +
                               "</tr>";

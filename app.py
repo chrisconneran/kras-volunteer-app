@@ -1144,6 +1144,7 @@ def check_volunteer():
                         SELECT
                             a.timestamp AS submitted_at,
                             a.title,
+                            a.status,
                             o.time        AS time_commitment,
                             o.duration    AS duration,
                             o.mode        AS frequency,
