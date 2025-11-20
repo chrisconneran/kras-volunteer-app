@@ -1137,7 +1137,7 @@ def check_volunteer():
                     response[
                         "activation_message"
                     ] = "We just sent a verification email. Please click the link in that email so you can submit your application."
-
+#add Assigned
                 if response["exists"] and response.get("activation_message", "") == "":
                     cur.execute(
                         """

@@ -321,7 +321,6 @@
                     <th>Title</th>
                     <th>Status</th>
                     <th>Time Commitment</th>
-                    <th>Duration</th>
                     <th>Frequency</th>
                     <th>Location</th>
                   </tr>
@@ -555,7 +554,7 @@
             $.get("/check", { email: verifiedEmail }, function(resp) {
 
               storedVolunteer = resp;
-              
+
 
               // Step 1 identity fields (make read-only)
               $("#check_email").val(resp.email || "").prop("readonly", true);
@@ -581,7 +580,6 @@
                                 "<td>" + (a.title || "") + "</td>" +
                                 "<td>" + (a.status || "") + "</td>" +
                                 "<td>" + (a.time_commitment || "") + "</td>" +
-                                "<td>" + (a.duration || "") + "</td>" +
                                 "<td>" + (a.frequency || "") + "</td>" +
                                 "<td>" + (a.location || "") + "</td>" +
                               "</tr>";
