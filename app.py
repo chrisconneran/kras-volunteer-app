@@ -1275,9 +1275,9 @@ def update_status(app_id):
         "Closed-Not Assigned"
     }
 
-# Protect against invalid data coming from the form
-if new_status not in allowed_statuses:
-    new_status = "Pending"
+    # Protect against invalid data coming from the form
+    if new_status not in allowed_statuses:
+        new_status = "Pending"
 
 
     with get_db_connection() as conn:
