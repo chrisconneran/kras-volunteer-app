@@ -16,7 +16,13 @@ from werkzeug.utils import secure_filename
 # =====
 app = Flask(__name__, static_folder="static", static_url_path="/static")
 app.secret_key = "supersecretkey"
+
+# Required so admin session survives on Render
+app.config["SESSION_COOKIE_SAMESITE"] = "None"
+app.config["SESSION_COOKIE_SECURE"] = True
+
 serializer = URLSafeTimedSerializer(app.secret_key)
+
 
 # Sessions expire after 30 minutes of inactivity
 app.permanent_session_lifetime = timedelta(minutes=30)
