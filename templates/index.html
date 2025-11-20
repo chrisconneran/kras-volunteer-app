@@ -235,6 +235,16 @@
         pointer-events: none;
         opacity: 0.45;
       }
+      /* Highlight newly added assignment row */
+      .highlight-new {
+        animation: flashHighlight 15s ease-out;
+      }
+
+      @keyframes flashHighlight {
+        0%   { background-color: #fffbd1; }
+        70%  { background-color: #ffe680; }
+        100% { background-color: transparent; }
+      }
     </style>
   </head>
 
@@ -651,13 +661,43 @@
           method: "POST",
           data: $(this).serialize(),
           success: function(resp) {
-            $("#successText").html(
-              "We have received your application to volunteer for: <b>" + resp.title + "</b>.<br><br>" +
-              "You will be contacted by a KRAS Kickers volunteer coordinator within 48 hours via your preferred method of contact.<br><br>" +
-              "Thank you!"
-            );
-            new bootstrap.Modal(document.getElementById("successModal")).show();
-          },
+        $("#successText").html(
+          "We have received your application to volunteer for: <b>" + resp.title + "</b>.<br><br>" +
+          "You will be contacted by a KRAS Kickers volunteer coordinator within 48 hours via your preferred method of contact.<br><br>" +
+          "Thank you!"
+        );
+
+        new bootstrap.Modal(document.getElementById("successModal")).show();
+
+        // 🔥 NEW: Refresh assignments immediately
+        const email = $("#form_email").val().trim().toLowerCase();
+        $.get("/check", { email: email }, function(resp2) {
+            const body = $("#assignmentsBody");
+            body.empty();
+            if (resp2.assignments && resp2.assignments.length > 0) {
+                resp2.assignments.forEach(function(a, index) {
+                // Create the row element
+                const row = document.createElement("tr");
+                row.innerHTML =
+                    "<td>" + (a.submitted_at || "") + "</td>" +
+                    "<td>" + (a.title || "") + "</td>" +
+                    "<td>" + (a.status || "") + "</td>" +
+                    "<td>" + (a.time_commitment || "") + "</td>" +
+                    "<td>" + (a.frequency || "") + "</td>" +
+                    "<td>" + (a.location || "") + "</td>";
+
+                // The newest assignment is the first in the list → highlight it
+                if (index === 0) {
+                    row.classList.add("highlight-new");
+                }
+
+                body.append(row);
+            });
+                $("#assignmentsContainer").removeClass("d-none");
+            }
+        });
+    },
+
           error: function(xhr) {
             var data = xhr.responseJSON || {};
             alert(data.error || "Your application could not be submitted.");
