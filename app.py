@@ -972,9 +972,14 @@ def view_applicants(opp_id):
         - share the same screen, but template can hide admin-only controls
     """
     # Permission check: admin or champion for this opportunity
-    if not user_can_manage_opportunity(opp_id):
-        # If not allowed, just send them to the main volunteer page
+    # Admins can view ALL opportunities
+    if session.get("admin_verified"):
+        pass  # allow admin
+
+    # Champions must be assigned to the opportunity
+    elif not user_is_champion_for_opportunity(opp_id):
         return redirect(url_for("index"))
+
 
     with get_db_connection() as conn:
         with conn.cursor() as cur:
