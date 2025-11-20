@@ -675,6 +675,10 @@
             const body = $("#assignmentsBody");
             body.empty();
             if (resp2.assignments && resp2.assignments.length > 0) {
+                // Sort assignments newest → oldest by submitted_at
+                resp2.assignments.sort(function(a, b) {
+                    return new Date(b.submitted_at) - new Date(a.submitted_at);
+                });
                 resp2.assignments.forEach(function(a, index) {
                 // Create the row element
                 const row = document.createElement("tr");
@@ -682,7 +686,7 @@
                     "<td>" + (a.submitted_at || "") + "</td>" +
                     "<td>" + (a.title || "") + "</td>" +
                     "<td>" + (a.status || "") + "</td>" +
-                    "<td>" + (a.time_commitment || "") + "</td>" +
+                    "<td>" + (a.time_commitment || "") + "</td>" +  
                     "<td>" + (a.frequency || "") + "</td>" +
                     "<td>" + (a.location || "") + "</td>";
 
