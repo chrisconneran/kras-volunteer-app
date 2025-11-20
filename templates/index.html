@@ -555,6 +555,7 @@
             $.get("/check", { email: verifiedEmail }, function(resp) {
 
               storedVolunteer = resp;
+              
 
               // Step 1 identity fields (make read-only)
               $("#check_email").val(resp.email || "").prop("readonly", true);
