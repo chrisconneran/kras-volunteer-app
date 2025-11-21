@@ -1000,16 +1000,16 @@ def view_applicants(opp_id):
             opp_cols = [
                 "id",
                 "title",
+                "desc",
                 "time",
                 "duration",
                 "mode",
-                "description",
-                "requirements",
                 "location",
+                "requirements",
                 "image",
                 "tags",
                 "closed",
-                "closed_date",
+                "closed_date"
             ]
             opportunity = dict(zip(opp_cols, row))
 
