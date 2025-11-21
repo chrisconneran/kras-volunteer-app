@@ -157,7 +157,7 @@
       <div class="opportunity-card mb-4">
         <div class="opportunity-content">
           {% if opportunity.image %}
-          <img src="{{ url_for('static', filename='uploads/' ~ opportunity.image) }}" alt="{{ opportunity.title }}">
+          <img src="{{ url_for('static', filename=opportunity.image) }}">
           {% endif %}
           <div class="flex-grow-1">
             <div class="card-title-row">
