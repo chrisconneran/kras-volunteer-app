@@ -1028,17 +1028,20 @@ def view_applicants(opp_id):
         # Fetch applicants: proper fuzzy title match (case + trim)
             cur.execute(
                 """
-                SELECT id, first_name, last_name, email, phone, contact,
+                SELECT
+                    id, first_name, last_name, email, phone, contact,
                     title, time, duration, mode, location,
                     comments, status, timestamp, history, notes
                 FROM applications
-                WHERE LOWER(TRIM(title)) = LOWER(TRIM(%s))
+                WHERE LOWER(TRIM(title)) = LOWER(
+                    (SELECT title FROM opportunities WHERE id = %s)
+                )
                 ORDER BY timestamp DESC
                 """,
-                (opportunity["title"],),
+                (opp_id,)
             )
-
             rows = cur.fetchall()
+
 
     applicants = []
     for r in rows:
