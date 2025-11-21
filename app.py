@@ -1026,20 +1026,27 @@ def view_applicants(opp_id):
 
 
             # Fetch applicants based on normalized title match
+            # Fetch applicants using the same logic you tested in DBeaver:
+            # match applications whose title matches this opportunity's title,
+            # case-insensitive and trimmed
             cur.execute(
                 """
-                SELECT 
+                SELECT
                     id, first_name, last_name, email, phone, contact,
                     title, time, duration, mode, location,
                     comments, status, timestamp, history, notes
                 FROM applications
-                WHERE regexp_replace(LOWER(title), '\s+', '', 'g') =
-                    regexp_replace(LOWER((SELECT title FROM opportunities WHERE id = %s)), '\s+', '', 'g')
+                WHERE LOWER(TRIM(title)) = LOWER(
+                    TRIM(
+                        (SELECT title FROM opportunities WHERE id = %s)
+                    )
+                )
                 ORDER BY timestamp DESC
                 """,
                 (opp_id,),
             )
             rows = cur.fetchall()
+
     applicants = []
     for r in rows:
         cols = [
