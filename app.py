@@ -1483,7 +1483,8 @@ def volunteer_detail(app_id):
                 )
                 row2 = cur.fetchone()
                 if row2:
-                    opp_id = row2[0]
+                    opp_id = row2["id"]
+
 
     back_opp_id = opp_id
     is_champion_view = not session.get("admin_verified")
