@@ -1067,7 +1067,8 @@ def view_applicants(opp_id):
             "history",
             "notes",
         ]
-        app_entry = dict(zip(cols, r))
+        app_entry = dict(r)
+
 
         history_raw = app_entry.get("history")
         if isinstance(history_raw, str) and history_raw.strip():
