@@ -1455,7 +1455,8 @@ def volunteer_detail(app_id):
                 "history",
                 "notes",
             ]
-            app_entry = dict(zip(cols, row))
+            app_entry = dict(row)
+
 
             history_raw = app_entry.get("history")
             if isinstance(history_raw, str) and history_raw.strip():
