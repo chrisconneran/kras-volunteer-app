@@ -135,7 +135,7 @@ def get_opportunity_id_for_application(app_id: int) -> int | None:
             row = cur.fetchone()
             if not row:
                 return None
-            opp_id = row[0]
+            opp_id = row["id"]
             return opp_id
 
 
