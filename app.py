@@ -1418,7 +1418,7 @@ def volunteer_detail(app_id):
         can_manage = True
 
     if not can_manage:
-        return redirect(url_for("index"))
+        can_manage = False
 
     with get_db_connection() as conn:
         with conn.cursor() as cur:
