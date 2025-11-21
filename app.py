@@ -997,15 +997,16 @@ def view_applicants(opp_id):
                 return "Opportunity not found", 404
 
             # Convert opportunity row to dict
+ 
             opp_cols = [
                 "id",
                 "title",
-                "desc",
                 "time",
                 "duration",
                 "mode",
-                "location",
+                "desc",
                 "requirements",
+                "location",
                 "image",
                 "tags",
                 "closed",
