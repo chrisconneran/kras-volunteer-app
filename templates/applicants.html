@@ -210,10 +210,15 @@
             {% for a in applicants %}
             <tr>
               <td>{{ a.timestamp }}</td>
-              <td>{{ a.first_name }} {{ a.last_name }}</td>
+              <td>{{ a.first_name }} {{ a.last_name }}</td>   
               <td>{{ a.email }}</td>
               <td>{{ a.status }}</td>
-              <td><a href="/volunteer/{{ a.id }}" class="btn btn-outline-primary btn-sm">Open</a></td>
+              <td>
+              <a href="{{ url_for('review_applicant', app_id=a.id) }}"
+                class="btn btn-outline-primary btn-sm">
+                Open
+              </a>
+            </td>
             </tr>
             {% endfor %}
           </tbody>
