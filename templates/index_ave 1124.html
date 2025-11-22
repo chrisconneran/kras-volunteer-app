@@ -146,6 +146,7 @@
         margin: 0 auto;
       }
 
+      /* Preferred contact row */
       .contact-row {
         display: flex;
         align-items: center;
@@ -175,6 +176,7 @@
         font-size: 0.7rem;
       }
 
+      /* Tighter spacing just for the Volunteer Sign-In form */
       .signin-form .mb-2 {
         margin-bottom: 0.15rem !important;
       }
@@ -185,6 +187,7 @@
         padding-bottom: 1px;
       }
 
+      /* Title left, tags right */
       .card-title-row {
         display: flex;
         align-items: center;
@@ -199,15 +202,17 @@
         flex-wrap: wrap;
       }
 
+      /* Highlight read-only opportunity fields in the application */
       .readonly-highlight[readonly] {
         color: #2563eb;
         font-weight: 600;
         background-color: #eef3ff;
       }
 
+      /* Current assignments grid under sign-in */
       .volunteer-assignments {
         margin-top: 6px;
-        max-height: 160px;
+        max-height: 160px; /* about 3 rows visible */
         overflow-y: auto;
         border: 1px solid #ddd;
         border-radius: 6px;
@@ -225,10 +230,12 @@
         z-index: 1;
       }
 
+      /* Lock visual for sections 2 and 3 */
       .locked {
         pointer-events: none;
         opacity: 0.45;
       }
+      /* Highlight newly added assignment row */
       .highlight-new {
         animation: flashHighlight 15s ease-out;
       }
@@ -254,6 +261,7 @@
         </div>
       </div>
 
+      <!-- ROW 1: Volunteer Sign-In (full width) -->
       <div class="row mb-2">
         <div class="col-12">
           <div class="form-section">
@@ -311,6 +319,7 @@
             </form>
             <div id="checkinMessage" class="mt-1 text-center small"></div>
 
+            <!-- Current volunteer assignments (populated after successful sign-in and verification) -->
             <div id="assignmentsContainer" class="volunteer-assignments d-none">
               <div class="fw-semibold px-2 pt-1">
                 Current Volunteer Assignments
@@ -327,6 +336,7 @@
                   </tr>
                 </thead>
                 <tbody id="assignmentsBody">
+                  <!-- rows injected by JavaScript -->
                 </tbody>
               </table>
             </div>
@@ -342,6 +352,7 @@
       </div>
       {% endif %}
 
+      <!-- Champion Assignments Section -->
       <div id="championAssignmentsContainer" class="volunteer-assignments d-none mt-2">
         <div class="fw-semibold px-2 pt-1">
           Opportunities You Champion
@@ -354,11 +365,15 @@
             </tr>
           </thead>
           <tbody id="championAssignmentsBody">
+            <!-- rows inserted by JavaScript -->
           </tbody>
         </table>
       </div>
 
+
+      <!-- ROW 2: Volunteer Application (left) + Opportunities (right) -->
       <div id="lockedSections" class="row gx-2 gy-2">
+        <!-- Left: Application -->
         <div class="col-md-4">
           <div class="form-section">
             <div class="section-title">
@@ -440,6 +455,7 @@
           </div>
         </div>
 
+        <!-- Right: Opportunities -->
         <div class="col-md-8">
           <div class="form-section opportunities-box">
             <div class="section-title text-center">
@@ -498,6 +514,7 @@
 
 
     <script>
+      // Manage locking/unlocking of sections 2 and 3 and the application form
       function setApplicationEnabled(enabled) {
         $("#volunteerForm :input").prop("disabled", !enabled);
       }
@@ -514,6 +531,7 @@
 
       const params = new URLSearchParams(window.location.search);
 
+      // Restore any stored volunteer info (used after verification)
       let storedVolunteer = null;
       try {
         const stored = localStorage.getItem("krasVolunteer");
@@ -524,77 +542,89 @@
         storedVolunteer = null;
       }
 
+      // On first load: keep sections 2–3 visible but locked
       lockAllSections();
 
+      // If returning from email verification (?verified=1), unlock sections and reload live data
       if (params.get("verified") === "1") {
         unlockAllSections();
 
-        let verifiedEmail = (storedVolunteer && storedVolunteer.email)
+       // Always prefer stored volunteer email after verification
+          let verifiedEmail = (storedVolunteer && storedVolunteer.email)
                                 ? storedVolunteer.email.toLowerCase()
                                 : $("#check_email").val().trim().toLowerCase();
 
-        if (storedVolunteer && storedVolunteer.email) {
-          $("#check_email").val(storedVolunteer.email);
+          // If stored email exists, ensure form shows it
+          if (storedVolunteer && storedVolunteer.email) {
+              $("#check_email").val(storedVolunteer.email);
+          }
+
+
+          if (verifiedEmail) {
+            $.get("/check", { email: verifiedEmail }, function(resp) {
+
+              storedVolunteer = resp;
+
+
+              // Step 1 identity fields (make read-only)
+              $("#check_email").val(resp.email || "").prop("readonly", true);
+              $("#check_first").val(resp.first_name || "").prop("readonly", true);
+              $("#check_last").val(resp.last_name || "").prop("readonly", true);
+              $("#check_phone").val(resp.phone || "").prop("readonly", true);
+
+              // Step 3 fields
+              $("#form_first").val(resp.first_name || "");
+              $("#form_last").val(resp.last_name || "");
+              $("#form_email").val(resp.email || "").prop("readonly", true);
+              $("#form_phone").val(resp.phone || "");
+
+              // Assignments table
+              const container = $("#assignmentsContainer");
+              const body = $("#assignmentsBody");
+              body.empty();
+
+              if (resp.assignments && resp.assignments.length > 0) {
+                resp.assignments.forEach(function(a) {
+                  const row = "<tr>" +
+                                "<td>" + (a.submitted_at || "") + "</td>" +
+                                "<td>" + (a.title || "") + "</td>" +
+                                "<td>" + (a.status || "") + "</td>" +
+                                "<td>" + (a.time_commitment || "") + "</td>" +
+                                "<td>" + (a.frequency || "") + "</td>" +
+                                "<td>" + (a.location || "") + "</td>" +
+                              "</tr>";
+                  body.append(row);
+                });
+                container.removeClass("d-none");
+              } else {
+                container.addClass("d-none");
+              }
+              /* Champion assignment rendering */
+              if (resp.champion_assignments && resp.champion_assignments.length > 0) {
+                const champContainer = $("#championAssignmentsContainer");
+                const champBody = $("#championAssignmentsBody");
+                champBody.empty();
+
+                resp.champion_assignments.forEach(function(c) {
+                  const row =
+                    "<tr>" +
+                      "<td>" + c.title + "</td>" +
+                      "<td><a href=\"/applicants/" + c.opp_id + "\" class=\"btn btn-outline-primary btn-sm\">Open</a></td>" +
+                    "</tr>";
+                  champBody.append(row);
+                });
+
+                champContainer.removeClass("d-none");
+              } else {
+                $("#championAssignmentsContainer").addClass("d-none");
+              }
+            });
+          }
         }
-
-        if (verifiedEmail) {
-          $.get("/check", { email: verifiedEmail }, function(resp) {
-
-            storedVolunteer = resp;
-
-            $("#check_email").val(resp.email || "").prop("readonly", true);
-            $("#check_first").val(resp.first_name || "").prop("readonly", true);
-            $("#check_last").val(resp.last_name || "").prop("readonly", true);
-            $("#check_phone").val(resp.phone || "").prop("readonly", true);
-
-            $("#form_first").val(resp.first_name || "");
-            $("#form_last").val(resp.last_name || "");
-            $("#form_email").val(resp.email || "").prop("readonly", true);
-            $("#form_phone").val(resp.phone || "");
-
-            const container = $("#assignmentsContainer");
-            const body = $("#assignmentsBody");
-            body.empty();
-
-            if (resp.assignments && resp.assignments.length > 0) {
-              resp.assignments.forEach(function(a) {
-                const row = "<tr>" +
-                              "<td>" + (a.submitted_at || "") + "</td>" +
-                              "<td>" + (a.title || "") + "</td>" +
-                              "<td>" + (a.status || "") + "</td>" +
-                              "<td>" + (a.time_commitment || "") + "</td>" +
-                              "<td>" + (a.frequency || "") + "</td>" +
-                              "<td>" + (a.location || "") + "</td>" +
-                            "</tr>";
-                body.append(row);
-              });
-              container.removeClass("d-none");
-            } else {
-              container.addClass("d-none");
-            }
-            if (resp.champion_assignments && resp.champion_assignments.length > 0) {
-              const champContainer = $("#championAssignmentsContainer");
-              const champBody = $("#championAssignmentsBody");
-              champBody.empty();
-
-              resp.champion_assignments.forEach(function(c) {
-                const row =
-                  "<tr>" +
-                    "<td>" + c.title + "</td>" +
-                    "<td><a href=\"/view_applications/" + c.opp_id + "\" class=\"btn btn-outline-primary btn-sm\">Open</a></td>" +
-                  "</tr>";
-                champBody.append(row);
-              });
-
-              champContainer.removeClass("d-none");
-            } else {
-              $("#championAssignmentsContainer").addClass("d-none");
-            }
-          });
-        }
-      }
      
+      // Populate opportunity form when "Apply Now" is clicked
       $(".apply-btn").on("click", function() {
+        // Require verification before selecting an opportunity
         if (params.get("verified") !== "1") {
           alert("Please verify your email (Step 1) before selecting an opportunity.");
           return;
@@ -615,9 +645,11 @@
         $('html, body').animate({ scrollTop: $("#volunteerForm").offset().top - 60 }, 300);
       });
 
+        // Submit volunteer application
       $("#volunteerForm").on("submit", function(e) {
         e.preventDefault();
 
+        // If backend told us to redirect after verification, do it before submitting
         const params = new URLSearchParams(window.location.search);
         if (params.get("verified") !== "1") {
           alert("Please verify your email before submitting the application.");
@@ -637,24 +669,28 @@
 
         new bootstrap.Modal(document.getElementById("successModal")).show();
 
+        // 🔥 NEW: Refresh assignments immediately
         const email = $("#form_email").val().trim().toLowerCase();
         $.get("/check", { email: email }, function(resp2) {
             const body = $("#assignmentsBody");
             body.empty();
             if (resp2.assignments && resp2.assignments.length > 0) {
+                // Sort assignments newest → oldest by submitted_at
                 resp2.assignments.sort(function(a, b) {
                     return new Date(b.submitted_at) - new Date(a.submitted_at);
                 });
                 resp2.assignments.forEach(function(a, index) {
+                // Create the row element
                 const row = document.createElement("tr");
                 row.innerHTML =
                     "<td>" + (a.submitted_at || "") + "</td>" +
                     "<td>" + (a.title || "") + "</td>" +
                     "<td>" + (a.status || "") + "</td>" +
-                    "<td>" + (a.time_commitment || "") + "</td>" +
+                    "<td>" + (a.time_commitment || "") + "</td>" +  
                     "<td>" + (a.frequency || "") + "</td>" +
                     "<td>" + (a.location || "") + "</td>";
 
+                // The newest assignment is the first in the list → highlight it
                 if (index === 0) {
                     row.classList.add("highlight-new");
                 }
@@ -674,6 +710,7 @@
       });
 
 
+      // Volunteer sign-in check
       $("#checkinForm").on("submit", function(e){
         e.preventDefault(); 
         const email = $("#check_email").val().trim();
@@ -681,15 +718,19 @@
         const last = $("#check_last").val().trim();
         const phone = $("#check_phone").val().trim();
 
-        $("#checkinMessage").html("<span class='text-primary'>Checking status... Email has been sent if needed.</span>");
+       // Show instant feedback BEFORE waiting for server
+      $("#checkinMessage").html("<span class='text-primary'>Checking status... Email has been sent if needed.</span>");
 
-        $.get("/check", { email: email }, function(resp){
+      $.get("/check", { email: email }, function(resp){
 
+
+          // NEW — required so verified session loads in SAME tab
           if (resp.redirect) {
             window.location = resp.redirect;
             return;
           }
 
+          // Fill sign-in message and pre-fill application form
           if (resp.exists) {
             $("#checkinMessage").html("<span class='text-success fw-semibold'>Welcome back, " + resp.first_name + "!</span>");
             $("#form_first").val(resp.first_name);
@@ -704,6 +745,7 @@
             $("#form_phone").val(phone);
           }
 
+          // Save latest data and assignments to localStorage for after verification
           const resolvedFirst = $("#form_first").val().trim();
           const resolvedLast = $("#form_last").val().trim();
           const resolvedEmail = $("#form_email").val().trim();
@@ -718,26 +760,35 @@
           try {
             localStorage.setItem("krasVolunteer", JSON.stringify(volunteerData));
           } catch (e) {
+            // ignore storage errors
           }
 
+          // Decide lock/unlock based on whether the backend still wants activation
           if (resp.activation_message) {
             $("#checkinMessage").append("<br>" + resp.activation_message);
             lockAllSections();
             $("#assignmentsContainer").addClass("d-none");
           } else {
+            // Email is verified for this session
             unlockAllSections();
 
+            // Make Step 1 identity fields read-only
             $("#check_email").prop("readonly", true);
             $("#check_first").prop("readonly", true);
             $("#check_last").prop("readonly", true);
             $("#check_phone").prop("readonly", true);
 
+            // Keep Step 3 email locked to the verified address
             $("#form_email").prop("readonly", true);
           }
         });
       });
 
 
+
+
+
+      // Auto-format phone numbers (xxx)xxx-xxxx for any .phone-mask inputs
       const phoneInputs = document.querySelectorAll('.phone-mask');
       phoneInputs.forEach(input => {
         input.addEventListener('input', function (e) {

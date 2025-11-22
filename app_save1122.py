@@ -525,7 +525,7 @@ def index():
                 WHERE email = %s
                 ORDER BY timestamp DESC
                 """,
-                (verified_email,),
+                (verified_email,)
             )
             my_assignments = dictify_rows(cur.fetchall())
 
@@ -554,7 +554,7 @@ def index():
                     WHERE LOWER(a.email) = %s
                     ORDER BY o.id
                     """,
-                    (verified_email,),
+                    (verified_email,)
                 )
 
                 champion_opps = dictify_rows(cur.fetchall())
@@ -966,12 +966,12 @@ def view_applicants(opp_id):
     View applicants for an opportunity.
 
     Admins:
-        can open for any opportunity
-        see admin view
+        - can open for any opportunity
+        - see admin view
 
     Champions:
-        can open only opportunities they are assigned to
-        share the same screen, but template can hide admin-only controls
+        - can open only opportunities they are assigned to
+        - share the same screen, but template can hide admin-only controls
     """
     # Permission check: admin or champion for this opportunity
     # Admins can view ALL opportunities
@@ -996,10 +996,23 @@ def view_applicants(opp_id):
             if not row:
                 return "Opportunity not found", 404
 
-            # Convert opportunity row to dict correctly
-            opportunity = dict(row)
-            if "description" in opportunity:
-                opportunity["desc"] = opportunity["description"]
+            # Convert opportunity row to dict
+ 
+            opp_cols = [
+                "id",
+                "title",
+                "time",
+                "duration",
+                "mode",
+                "desc",
+                "requirements",
+                "location",
+                "image",
+                "tags",
+                "closed",
+                "closed_date"
+            ]
+            opportunity = dict(zip(opp_cols, row))
 
             # Normalize tags
             tags_raw = opportunity.get("tags")
@@ -1013,6 +1026,7 @@ def view_applicants(opp_id):
             opportunity["frequency"] = opportunity.get("mode", "")
 
 
+            # Fetch applicants based on normalized title match
             # Fetch applicants using the same logic you tested in DBeaver:
             # match applications whose title matches this opportunity's title,
             # case-insensitive and trimmed
@@ -1036,7 +1050,26 @@ def view_applicants(opp_id):
 
     applicants = []
     for r in rows:
+        cols = [
+            "id",
+            "first_name",
+            "last_name",
+            "email",
+            "phone",
+            "contact",
+            "title",
+            "time",
+            "duration",
+            "mode",
+            "location",
+            "comments",
+            "status",
+            "timestamp",
+            "history",
+            "notes",
+        ]
         app_entry = dict(r)
+
 
         history_raw = app_entry.get("history")
         if isinstance(history_raw, str) and history_raw.strip():
@@ -1059,8 +1092,8 @@ def view_applicants(opp_id):
         applicants.append(app_entry)
 
     # Back button behavior:
-    # Admins go back to the admin menu
-    # Champions go back to the main volunteer page
+    # - Admins go back to the admin menu
+    # - Champions go back to the main volunteer page
     back_to_menu_url = (
         url_for("menu") if session.get("admin_verified") else url_for("index")
     )
@@ -1239,10 +1272,10 @@ def update_status(app_id):
     Update the status of an application.
 
     Admins:
-        can update any application
+        - can update any application
 
     Champions:
-        can update only applications for opportunities they champion
+        - can update only applications for opportunities they champion
     """
     # Figure out which opportunity this application belongs to
     opp_id = get_opportunity_id_for_application(app_id)
@@ -1370,10 +1403,10 @@ def volunteer_detail(app_id):
     Volunteer detail and assignment screen.
 
     Admins:
-        can open for any application
+        - can open for any application
     Champions:
-        can open only if they are champion for the related opportunity
-        cannot delete applications (delete route still admin-only)
+        - can open only if they are champion for the related opportunity
+        - cannot delete applications (delete route still admin-only)
     """
     # Determine the opportunity id related to this application
     opp_id = get_opportunity_id_for_application(app_id)
@@ -1468,6 +1501,7 @@ def volunteer_detail(app_id):
     )
 
 
+# ---------
 @app.route("/api/applicant/<int:app_id>")
 def api_get_applicant(app_id):
     with get_db_connection() as conn:
@@ -1529,9 +1563,9 @@ def view_applications(opp_id):
     """
     Loads the unified View Applications page.
     Shows:
-      Opportunity info
-      All applicants for that opportunity
-      Lets the JS panel load applicant details dynamically
+      - Opportunity info
+      - All applicants for that opportunity
+      - Lets the JS panel load applicant details dynamically
     """
     # AUTH: Admins can view any opportunity
     if session.get("admin_verified"):
@@ -1556,10 +1590,12 @@ def view_applications(opp_id):
             if not row:
                 return "Opportunity not found", 404
 
-            # Correct dict construction
-            opportunity = dict(row)
-            if "description" in opportunity:
-                opportunity["desc"] = opportunity["description"]
+            opp_cols = [
+                "id", "title", "time", "duration", "mode", "desc",
+                "requirements", "location", "image", "tags",
+                "closed", "closed_date"
+            ]
+            opportunity = dict(zip(opp_cols, row))
 
             # Normalize tags → list
             try:
@@ -1583,18 +1619,22 @@ def view_applications(opp_id):
             """, (opp_id,))
             applicants_raw = cur.fetchall()
 
-    # Convert rows to dicts correctly
+    # Convert rows to dicts
     applicants = []
     for a in applicants_raw:
-        applicants.append(dict(a))
-
-    back_to_menu_url = url_for("menu") if session.get("admin_verified") else url_for("index")
+        a_cols = [
+            "id", "first_name", "last_name", "email", "phone",
+            "contact", "title", "time", "duration", "mode",
+            "location", "comments", "status", "timestamp",
+            "history", "notes"
+        ]
+        applicants.append(dict(zip(a_cols, a)))
 
     return render_template(
         "view_applications.html",
         opportunity=opportunity,
         applicants=applicants,
-        back_to_menu_url=back_to_menu_url
+        back_to_menu_url=url_for("menu")
     )
 
 
@@ -1607,10 +1647,10 @@ def add_note(app_id):
     Add an admin or champion note to an application.
 
     Admins:
-        can add notes for any application
+        - can add notes for any application
 
     Champions:
-        can add notes only for applications for opportunities they champion
+        - can add notes only for applications for opportunities they champion
     """
     note_text = (request.form.get("note") or "").strip()
     if not note_text:
