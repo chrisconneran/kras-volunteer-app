@@ -1501,6 +1501,143 @@ def volunteer_detail(app_id):
     )
 
 
+# ---------
+@app.route("/api/applicant/<int:app_id>")
+def api_get_applicant(app_id):
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT id, first_name, last_name, email, phone, contact,
+                       title, time, duration, mode, location,
+                       comments, status, timestamp, history, notes
+                FROM applications
+                WHERE id = %s
+            """, (app_id,))
+            row = cur.fetchone()
+
+    if not row:
+        return jsonify({"error": "Applicant not found"}), 404
+
+    cols = [
+        "id", "first_name", "last_name", "email", "phone", "contact",
+        "title", "time", "duration", "mode", "location",
+        "comments", "status", "timestamp", "history", "notes"
+    ]
+    data = dict(zip(cols, row))
+
+    return jsonify(data)
+
+@app.route("/api/applicant/<int:app_id>/update", methods=["POST"])
+def api_update_applicant(app_id):
+    new_status = request.form.get("status")
+    new_note = request.form.get("note")
+
+    if not new_status:
+        return jsonify({"error": "Missing status"}), 400
+
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+
+            # Save status
+            cur.execute("""
+                UPDATE applications
+                SET status = %s
+                WHERE id = %s
+            """, (new_status, app_id))
+
+            # Append note (if provided)
+            if new_note and new_note.strip():
+                cur.execute("""
+                    UPDATE applications
+                    SET notes = COALESCE(notes, '') || %s
+                    WHERE id = %s
+                """, ("\n" + new_note.strip(), app_id))
+
+        conn.commit()
+
+    return jsonify({"success": True})
+
+
+@app.route("/view_applications/<int:opp_id>")
+def view_applications(opp_id):
+    """
+    Loads the unified View Applications page.
+    Shows:
+      - Opportunity info
+      - All applicants for that opportunity
+      - Lets the JS panel load applicant details dynamically
+    """
+    # AUTH: Admins can view any opportunity
+    if session.get("admin_verified"):
+        pass
+    else:
+        # Champions must be assigned
+        if not user_is_champion_for_opportunity(opp_id):
+            return redirect(url_for("index"))
+
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+
+            # Get the opportunity (image, title, etc.)
+            cur.execute("""
+                SELECT id, title, time, duration, mode, description,
+                       requirements, location, image, tags, closed, closed_date
+                FROM opportunities
+                WHERE id = %s
+            """, (opp_id,))
+            row = cur.fetchone()
+
+            if not row:
+                return "Opportunity not found", 404
+
+            opp_cols = [
+                "id", "title", "time", "duration", "mode", "desc",
+                "requirements", "location", "image", "tags",
+                "closed", "closed_date"
+            ]
+            opportunity = dict(zip(opp_cols, row))
+
+            # Normalize tags → list
+            try:
+                if opportunity["tags"]:
+                    opportunity["tags"] = json.loads(opportunity["tags"])
+                else:
+                    opportunity["tags"] = []
+            except:
+                opportunity["tags"] = []
+
+            # Now fetch applicants tied to this opportunity
+            cur.execute("""
+                SELECT id, first_name, last_name, email, phone, contact,
+                       title, time, duration, mode, location,
+                       comments, status, timestamp, history, notes
+                FROM applications
+                WHERE LOWER(TRIM(title)) = LOWER(
+                    TRIM((SELECT title FROM opportunities WHERE id = %s))
+                )
+                ORDER BY timestamp DESC
+            """, (opp_id,))
+            applicants_raw = cur.fetchall()
+
+    # Convert rows to dicts
+    applicants = []
+    for a in applicants_raw:
+        a_cols = [
+            "id", "first_name", "last_name", "email", "phone",
+            "contact", "title", "time", "duration", "mode",
+            "location", "comments", "status", "timestamp",
+            "history", "notes"
+        ]
+        applicants.append(dict(zip(a_cols, a)))
+
+    return render_template(
+        "view_applications.html",
+        opportunity=opportunity,
+        applicants=applicants,
+        back_to_menu_url=url_for("menu")
+    )
+
+
 # =====
 # Admin notes
 # =====
