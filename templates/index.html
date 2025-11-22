@@ -235,6 +235,16 @@
         pointer-events: none;
         opacity: 0.45;
       }
+      /* Highlight newly added assignment row */
+      .highlight-new {
+        animation: flashHighlight 15s ease-out;
+      }
+
+      @keyframes flashHighlight {
+        0%   { background-color: #fffbd1; }
+        70%  { background-color: #ffe680; }
+        100% { background-color: transparent; }
+      }
     </style>
   </head>
 
@@ -319,8 +329,8 @@
                   <tr>
                     <th>Date Submitted</th>
                     <th>Title</th>
+                    <th>Status</th>
                     <th>Time Commitment</th>
-                    <th>Duration</th>
                     <th>Frequency</th>
                     <th>Location</th>
                   </tr>
@@ -333,6 +343,33 @@
           </div>
         </div>
       </div>
+
+      {% if champion_opps|length > 0 %}
+      <div class="mt-2 mb-2">
+        <a href="#championAssignmentsContainer" class="btn btn-primary btn-sm">
+          Manage My Opportunities
+        </a>
+      </div>
+      {% endif %}
+
+      <!-- Champion Assignments Section -->
+      <div id="championAssignmentsContainer" class="volunteer-assignments d-none mt-2">
+        <div class="fw-semibold px-2 pt-1">
+          Opportunities You Champion
+        </div>
+        <table class="table table-sm mb-0">
+          <thead>
+            <tr>
+              <th>Opportunity</th>
+              <th>Manage</th>
+            </tr>
+          </thead>
+          <tbody id="championAssignmentsBody">
+            <!-- rows inserted by JavaScript -->
+          </tbody>
+        </table>
+      </div>
+
 
       <!-- ROW 2: Volunteer Application (left) + Opportunities (right) -->
       <div id="lockedSections" class="row gx-2 gy-2">
@@ -528,6 +565,7 @@
 
               storedVolunteer = resp;
 
+
               // Step 1 identity fields (make read-only)
               $("#check_email").val(resp.email || "").prop("readonly", true);
               $("#check_first").val(resp.first_name || "").prop("readonly", true);
@@ -550,8 +588,8 @@
                   const row = "<tr>" +
                                 "<td>" + (a.submitted_at || "") + "</td>" +
                                 "<td>" + (a.title || "") + "</td>" +
+                                "<td>" + (a.status || "") + "</td>" +
                                 "<td>" + (a.time_commitment || "") + "</td>" +
-                                "<td>" + (a.duration || "") + "</td>" +
                                 "<td>" + (a.frequency || "") + "</td>" +
                                 "<td>" + (a.location || "") + "</td>" +
                               "</tr>";
@@ -560,6 +598,25 @@
                 container.removeClass("d-none");
               } else {
                 container.addClass("d-none");
+              }
+              /* Champion assignment rendering */
+              if (resp.champion_assignments && resp.champion_assignments.length > 0) {
+                const champContainer = $("#championAssignmentsContainer");
+                const champBody = $("#championAssignmentsBody");
+                champBody.empty();
+
+                resp.champion_assignments.forEach(function(c) {
+                  const row =
+                    "<tr>" +
+                      "<td>" + c.title + "</td>" +
+                      "<td><a href=\"/applicants/" + c.opp_id + "\" class=\"btn btn-outline-primary btn-sm\">Open</a></td>" +
+                    "</tr>";
+                  champBody.append(row);
+                });
+
+                champContainer.removeClass("d-none");
+              } else {
+                $("#championAssignmentsContainer").addClass("d-none");
               }
             });
           }
@@ -604,13 +661,47 @@
           method: "POST",
           data: $(this).serialize(),
           success: function(resp) {
-            $("#successText").html(
-              "We have received your application to volunteer for: <b>" + resp.title + "</b>.<br><br>" +
-              "You will be contacted by a KRAS Kickers volunteer coordinator within 48 hours via your preferred method of contact.<br><br>" +
-              "Thank you!"
-            );
-            new bootstrap.Modal(document.getElementById("successModal")).show();
-          },
+        $("#successText").html(
+          "We have received your application to volunteer for: <b>" + resp.title + "</b>.<br><br>" +
+          "You will be contacted by a KRAS Kickers volunteer coordinator within 48 hours via your preferred method of contact.<br><br>" +
+          "Thank you!"
+        );
+
+        new bootstrap.Modal(document.getElementById("successModal")).show();
+
+        // 🔥 NEW: Refresh assignments immediately
+        const email = $("#form_email").val().trim().toLowerCase();
+        $.get("/check", { email: email }, function(resp2) {
+            const body = $("#assignmentsBody");
+            body.empty();
+            if (resp2.assignments && resp2.assignments.length > 0) {
+                // Sort assignments newest → oldest by submitted_at
+                resp2.assignments.sort(function(a, b) {
+                    return new Date(b.submitted_at) - new Date(a.submitted_at);
+                });
+                resp2.assignments.forEach(function(a, index) {
+                // Create the row element
+                const row = document.createElement("tr");
+                row.innerHTML =
+                    "<td>" + (a.submitted_at || "") + "</td>" +
+                    "<td>" + (a.title || "") + "</td>" +
+                    "<td>" + (a.status || "") + "</td>" +
+                    "<td>" + (a.time_commitment || "") + "</td>" +  
+                    "<td>" + (a.frequency || "") + "</td>" +
+                    "<td>" + (a.location || "") + "</td>";
+
+                // The newest assignment is the first in the list → highlight it
+                if (index === 0) {
+                    row.classList.add("highlight-new");
+                }
+
+                body.append(row);
+            });
+                $("#assignmentsContainer").removeClass("d-none");
+            }
+        });
+    },
+
           error: function(xhr) {
             var data = xhr.responseJSON || {};
             alert(data.error || "Your application could not be submitted.");

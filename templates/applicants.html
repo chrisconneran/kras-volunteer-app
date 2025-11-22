@@ -10,7 +10,6 @@
         font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       }
 
-      /* Blue header box */
       .header-box {
         background-color: #e8f0ff;
         border-radius: 10px;
@@ -147,25 +146,31 @@
               <div class="header-subtitle">See volunteers who applied for this opportunity</div>
             </div>
           </div>
-          <a href="/manage" class="btn btn-outline-primary btn-sm">Back to Manage</a>
+
+          <!-- CHANGED LINE: use back_to_menu_url -->
+          <a href="{{ back_to_menu_url }}" class="btn btn-outline-primary btn-sm">Back</a>
+
         </div>
       </div>
 
       <!-- Opportunity Card -->
       <div class="opportunity-card mb-4">
         <div class="opportunity-content">
-          {% if opportunity.image %}
-          <img src="{{ url_for('static', filename=opportunity.image) }}" alt="{{ opportunity.title }}">
-          {% endif %}
-          <div class="flex-grow-1">
+         {% if opportunity.image %}
+           <img src="{{ url_for('static', filename='uploads/' ~ opportunity.image) }}" alt="{{ opportunity.title }}">
+           {% endif %}
+           <div class="flex-grow-1">
             <div class="card-title-row">
               <div class="card-title mb-0">{{ opportunity.title }}</div>
               <div class="tag-box-inline">
+
+                <!-- CHANGED: tags are plain strings -->
                 {% if opportunity.tags %}
                   {% for tag in opportunity.tags %}
-                    <span class="badge-tag" style="background-color: {{ tag.color }}">{{ tag.name }}</span>
+                    <span class="badge-tag" style="background-color: #2563eb">{{ tag }}</span>
                   {% endfor %}
                 {% endif %}
+
               </div>
             </div>
 
@@ -185,7 +190,6 @@
 
       <!-- Applicants Table Block -->
       <div class="opportunity-card">
-        <!-- Title + Search bar in same row -->
         <div class="d-flex justify-content-between align-items-center mb-3">
           <h5 class="fw-bold mb-0">Volunteer Applicants</h5>
           <input id="searchInput" type="text" class="form-control form-control-sm search-input" placeholder="Search by name or email">
@@ -206,10 +210,15 @@
             {% for a in applicants %}
             <tr>
               <td>{{ a.timestamp }}</td>
-              <td>{{ a.first_name }} {{ a.last_name }}</td>
+              <td>{{ a.first_name }} {{ a.last_name }}</td>   
               <td>{{ a.email }}</td>
               <td>{{ a.status }}</td>
-              <td><a href="/volunteer/{{ a.id }}" class="btn btn-outline-primary btn-sm">Open</a></td>
+              <td>
+              <a href="{{ url_for('volunteer_detail', app_id=a.id) }}"
+                class="btn btn-outline-primary btn-sm">
+                Open
+              </a>
+            </td>
             </tr>
             {% endfor %}
           </tbody>
@@ -222,7 +231,6 @@
     </div>
 
     <script>
-      // Simple client-side search filtering
       const searchInput = document.getElementById('searchInput');
       const tableRows = document.querySelectorAll('#applicantsTable tr');
 
