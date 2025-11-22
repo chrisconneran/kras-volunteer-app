@@ -1,175 +1,193 @@
 <!doctype html>
 <html lang="en">
 <head>
-    <meta charset="utf-8">
-    <title>View Applicants - {{ opportunity.title }}</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <meta charset="utf-8">
+  <title>View Applicants – {{ opportunity.title }}</title>
 
-    <style>
-        body {
-            background-color: #f8f9fc;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 
-        .opportunity-card img {
-            width: 120px;
-            height: 120px;
-            object-fit: cover;
-            border-radius: 6px;
-            border: 1px solid #ccc;
-        }
-
-        .list-panel {
-            max-height: 70vh;
-            overflow-y: auto;
-            border-right: 1px solid #dee2e6;
-        }
-
-        .applicant-row {
-            padding: 10px;
-            cursor: pointer;
-            border-bottom: 1px solid #eee;
-        }
-
-        .applicant-row:hover {
-            background-color: #e8f0ff;
-        }
-
-        .applicant-row.active {
-            background-color: #dbeafe;
-        }
-
-        .detail-panel {
-            padding: 15px;
-        }
-    </style>
+  <style>
+    body {
+      background-color: #f8f9fc;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    .header-box {
+      background-color: #e8f0ff;
+      border-radius: 10px;
+      padding: 15px 20px;
+      margin-bottom: 20px;
+    }
+    .logo {
+      height: 55px;
+    }
+    .opp-image {
+      width: 110px;
+      height: 110px;
+      object-fit: cover;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+      background: #fff;
+    }
+    #applicantList {
+      max-height: 70vh;
+      overflow-y: auto;
+      border-right: 1px solid #ddd;
+    }
+    .applicant-item {
+      padding: 10px;
+      border-bottom: 1px solid #eee;
+      cursor: pointer;
+    }
+    .applicant-item:hover {
+      background-color: #eef5ff;
+    }
+    .selected {
+      background-color: #dbeafe !important;
+    }
+    #detailPanel {
+      min-height: 70vh;
+    }
+  </style>
 </head>
 
 <body class="p-4">
-<div class="container">
+
+  <div class="container">
 
     <!-- HEADER -->
-    <div class="header-box shadow-sm mb-4 p-3 d-flex justify-content-between align-items-center">
-        <div class="d-flex align-items-center gap-3">
-            <img src="{{ url_for('static', filename='kras_logo.png') }}" class="logo" style="height:55px">
-            <div>
-                <div class="header-title" style="font-size:1.6rem; font-weight:700;">View Applicants</div>
-                <div class="header-subtitle text-muted">Review volunteers who applied for this opportunity</div>
-            </div>
+    <div class="header-box d-flex justify-content-between align-items-center">
+      <div class="d-flex align-items-center gap-3">
+        <img src="{{ url_for('static', filename='kras_logo.png') }}" class="logo">
+        <div>
+          <h3 class="fw-bold text-primary mb-0">View Applicants</h3>
+          <div class="text-muted">Review volunteers who applied for this opportunity</div>
         </div>
-        <a href="{{ back_to_menu_url }}" class="btn btn-outline-primary btn-sm">Back</a>
+      </div>
+
+      <a href="{{ back_to_menu_url }}" class="btn btn-outline-primary btn-sm">Back</a>
     </div>
 
-    <!-- OPPORTUNITY INFO -->
-    <div class="opportunity-card p-3 mb-4 bg-white border rounded shadow-sm">
-        <div class="d-flex gap-3">
-            {% if opportunity.image %}
-                <img src="{{ url_for('static', filename=opportunity.image) }}" alt="{{ opportunity.title }}">
-            {% endif %}
-            <div>
-                <h4 class="fw-bold mb-1">{{ opportunity.title }}</h4>
-                <div><b>Time:</b> {{ opportunity.time }}</div>
-                <div><b>Duration:</b> {{ opportunity.duration }}</div>
-                <div><b>Mode:</b> {{ opportunity.mode }}</div>
-                <div><b>Location:</b> {{ opportunity.location }}</div>
-                <div><b>Requirements:</b> {{ opportunity.requirements }}</div>
-                <div><b>Description:</b> {{ opportunity.desc }}</div>
-            </div>
+    <!-- OPPORTUNITY HEADER -->
+    <div class="card p-3 mb-4">
+      <div class="d-flex align-items-start gap-4">
+
+        {% if opportunity.image %}
+          <img src="{{ url_for('static', filename=opportunity.image) }}"
+               class="opp-image"
+               alt="{{ opportunity.title }}">
+        {% endif %}
+
+        <div>
+          <h5 class="fw-bold">{{ opportunity.title }}</h5>
+          <div><b>Time:</b> {{ opportunity.time }}</div>
+          <div><b>Duration:</b> {{ opportunity.duration }}</div>
+          <div><b>Mode:</b> {{ opportunity.mode }}</div>
+          <div><b>Location:</b> {{ opportunity.location }}</div>
+          {% if opportunity.requirements %}
+            <div><b>Requirements:</b> {{ opportunity.requirements }}</div>
+          {% endif %}
+          {% if opportunity.desc %}
+            <div><b>Description:</b> {{ opportunity.desc }}</div>
+          {% endif %}
         </div>
+
+      </div>
     </div>
 
-    <!-- MAIN PANELS -->
-    <div class="row bg-white border rounded shadow-sm">
+    <!-- MAIN TWO-PANEL LAYOUT -->
+    <div class="card p-3">
+      <div class="row">
 
-        <!-- LEFT PANEL: APPLICANT LIST -->
-        <div class="col-4 list-panel">
-            <h5 class="fw-bold p-2">Applicants</h5>
+        <!-- LEFT PANEL — Applicant list -->
+        <div class="col-md-4" id="applicantList">
+          <h6 class="fw-bold mb-2">Applicants</h6>
 
-            {% for a in applicants %}
-            <div class="applicant-row" data-id="{{ a.id }}">
-                <div class="fw-bold">{{ a.first_name }} {{ a.last_name }}</div>
-                <div class="text-muted" style="font-size:0.85rem">{{ a.email }}</div>
-                <div>Status: {{ a.status }}</div>
-            </div>
-            {% endfor %}
+          {% for a in applicants %}
+          <div class="applicant-item"
+               data-id="{{ a.id }}"
+               data-name="{{ a.first_name }} {{ a.last_name }}"
+               data-email="{{ a.email }}"
+               data-status="{{ a.status }}"
+               data-phone="{{ a.phone }}"
+               data-contact="{{ a.contact }}"
+               data-comments="{{ a.comments }}"
+               data-time="{{ a.time }}"
+               data-duration="{{ a.duration }}"
+               data-location="{{ a.location }}">
+
+            <div class="fw-semibold">{{ a.first_name }} {{ a.last_name }}</div>
+            <div class="small text-muted">{{ a.email }}</div>
+            <div class="small"><b>Status:</b> {{ a.status }}</div>
+          </div>
+          {% endfor %}
+
         </div>
 
-        <!-- RIGHT PANEL: DETAILS -->
-        <div class="col-8 detail-panel" id="detailPanel">
-            <div class="text-muted">Select an applicant to view full details.</div>
+        <!-- RIGHT PANEL — Detail panel -->
+        <div class="col-md-8 ps-4" id="detailPanel">
+          <div class="text-muted">Select an applicant to view full details.</div>
         </div>
 
+      </div>
     </div>
-</div>
+
+  </div>
 
 <script>
-    const rows = document.querySelectorAll(".applicant-row");
-    const detailPanel = document.getElementById("detailPanel");
+  const items = document.querySelectorAll('.applicant-item');
+  const panel = document.getElementById('detailPanel');
 
-    rows.forEach(row => {
-        row.addEventListener("click", () => {
-            const id = row.dataset.id;
+  items.forEach(item => {
+    item.addEventListener('click', () => {
 
-            rows.forEach(r => r.classList.remove("active"));
-            row.classList.add("active");
+      document.querySelectorAll('.applicant-item')
+              .forEach(el => el.classList.remove('selected'));
 
-            fetch(`/api/applicant/${id}`)
-                .then(resp => resp.json())
-                .then(data => {
-                    detailPanel.innerHTML = `
-                        <h4 class="fw-bold mb-3">${data.first_name} ${data.last_name}</h4>
+      item.classList.add('selected');
 
-                        <div><b>Email:</b> ${data.email}</div>
-                        <div><b>Preferred Contact:</b> ${data.contact}</div>
-                        <div><b>Opportunity:</b> ${data.title}</div>
-                        <div><b>Time:</b> ${data.time}</div>
-                        <div><b>Duration:</b> ${data.duration}</div>
-                        <div><b>Location:</b> ${data.location}</div>
+      panel.innerHTML = `
+        <h5 class="fw-bold mb-3">${item.dataset.name}</h5>
+        <div><b>Email:</b> ${item.dataset.email}</div>
+        <div><b>Preferred Contact:</b> ${item.dataset.contact}</div>
+        <div><b>Phone:</b> ${item.dataset.phone}</div>
+        <hr>
+        <div><b>Time:</b> ${item.dataset.time}</div>
+        <div><b>Duration:</b> ${item.dataset.duration}</div>
+        <div><b>Location:</b> ${item.dataset.location}</div>
+        <hr>
+        <div><b>Comments:</b><br>${item.dataset.comments || 'None'}</div>
 
-                        <hr>
+        <hr>
+        <label class="fw-bold mt-3">Status</label>
+        <select id="statusSelect" class="form-select" style="max-width:200px">
+          <option ${item.dataset.status === 'Pending' ? 'selected' : ''}>Pending</option>
+          <option ${item.dataset.status === 'Approved' ? 'selected' : ''}>Approved</option>
+          <option ${item.dataset.status === 'Rejected' ? 'selected' : ''}>Rejected</option>
+          <option ${item.dataset.status === 'Completed' ? 'selected' : ''}>Completed</option>
+        </select>
 
-                        <label class="fw-bold">Status</label>
-                        <select id="statusSelect" class="form-select form-select-sm w-auto">
-                            <option value="Pending" ${data.status === 'Pending' ? "selected" : ""}>Pending</option>
-                            <option value="Assigned" ${data.status === 'Assigned' ? "selected" : ""}>Assigned</option>
-                            <option value="Completed" ${data.status === 'Completed' ? "selected" : ""}>Completed</option>
-                            <option value="Declined" ${data.status === 'Declined' ? "selected" : ""}>Declined</option>
-                        </select>
-
-                        <button class="btn btn-primary btn-sm mt-2" onclick="saveStatus(${data.id})">Save</button>
-
-                        <hr>
-
-                        <label class="fw-bold">Notes</label>
-                        <textarea id="notesInput" class="form-control" rows="4">${data.notes || ""}</textarea>
-                        <button class="btn btn-secondary btn-sm mt-2" onclick="saveNotes(${data.id})">Save Notes</button>
-                    `;
-                });
-        });
+        <button class="btn btn-primary mt-3"
+                onclick="saveStatus(${item.dataset.id})">
+          Save
+        </button>
+      `;
     });
+  });
 
-    function saveStatus(id) {
-        const status = document.getElementById("statusSelect").value;
+  function saveStatus(id) {
+    const newStatus = document.getElementById('statusSelect').value;
 
-        const formData = new FormData();
-        formData.append("status", status);
-
-        fetch(`/api/applicant/${id}/update`, { method: "POST", body: formData })
-            .then(r => r.json())
-            .then(() => alert("Status updated successfully"));
-    }
-
-    function saveNotes(id) {
-        const note = document.getElementById("notesInput").value;
-
-        const formData = new FormData();
-        formData.append("status", document.getElementById("statusSelect").value);
-        formData.append("note", note);
-
-        fetch(`/api/applicant/${id}/update`, { method: "POST", body: formData })
-            .then(r => r.json())
-            .then(() => alert("Notes saved successfully"));
-    }
+    fetch('/update_application_status/' + id, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: newStatus })
+    })
+    .then(r => r.json())
+    .then(() => {
+      alert('Status updated!');
+      location.reload();
+    });
+  }
 </script>
 
 </body>
