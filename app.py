@@ -20,11 +20,15 @@ app.secret_key = "supersecretkey"
 # Required so admin session survives on Render
 app.config["SESSION_COOKIE_SAMESITE"] = "None"
 app.config["SESSION_COOKIE_SECURE"] = True
+# Strengthen session persistence
+app.config["SESSION_COOKIE_HTTPONLY"] = True
+app.config["SESSION_COOKIE_PATH"] = "/"
+
 
 serializer = URLSafeTimedSerializer(app.secret_key)
 
 
-# Sessions expire after 30 minutes of inactivity
+# Sessions expire after 30 minutes of inactivity    
 app.permanent_session_lifetime = timedelta(minutes=30)
 
 # Static uploads
@@ -1109,8 +1113,9 @@ def view_applicants(opp_id):
     # Admins go back to the admin menu
     # Champions go back to the main volunteer page
     back_to_menu_url = (
-        url_for("menu") if session.get("admin_verified") else url_for("index")
+    url_for("menu") if session.get("admin_verified") else url_for("index", verified=1)
     )
+
     is_champion_view = not session.get("admin_verified")
 
     return render_template(

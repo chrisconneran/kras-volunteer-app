@@ -589,7 +589,14 @@
           });
         }
       }
-     
+      // Step 3 fix: auto-refresh volunteer data after back button returns with ?verified=1
+      if (window.location.search.includes("verified=1")) {
+          const savedEmail = ($("#email").val() || "").trim().toLowerCase();
+          if (savedEmail) {
+              checkStatus(savedEmail);
+          }
+      }
+
       $(".apply-btn").on("click", function() {
         if (params.get("verified") !== "1") {
           alert("Please verify your email (Step 1) before selecting an opportunity.");
