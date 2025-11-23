@@ -1352,6 +1352,21 @@ def update_status(app_id):
                 """,
                 (new_status, json.dumps(history_list), app_id),
             )
+            # ==========================================
+            # AUTO-PROMOTE TO CHAMPION IF ASSIGNED
+            # ==========================================
+            cur.execute(
+                "SELECT title FROM applications WHERE id = %s",
+                (app_id,)
+            )
+            row2 = cur.fetchone()
+
+            if row2 and row2.get("title", "").strip().lower() == "champion-leader":
+                if new_status == "Assigned":
+                    cur.execute(
+                        "UPDATE applications SET is_champion = TRUE WHERE id = %s",
+                        (app_id,)
+                    )
             conn.commit()
 
     return jsonify({"message": "Status updated successfully"})
