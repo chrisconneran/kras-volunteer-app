@@ -1128,6 +1128,8 @@ def view_applicants(opp_id):
 @app.route("/check")
 def check_volunteer():
     email = (request.args.get("email") or "").strip().lower()
+    session.permanent = True
+
 
     if not email:
         return jsonify({"error": "Email is required"}), 400
@@ -1663,8 +1665,12 @@ def view_applications(opp_id):
 
         applicants.append(a)
 
-    # Back button routing
-    back_to_menu_url = url_for("manage")
+   
+    # Back button routing: Admins → manage, Champions → index
+    back_to_menu_url = (
+        url_for("manage") if session.get("admin_verified") else url_for("index")
+    )
+
 
 
     return render_template(
