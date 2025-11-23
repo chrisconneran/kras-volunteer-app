@@ -436,9 +436,10 @@ def save_application(form_data: dict) -> int:
 # =====
 @app.route("/logout")
 def logout():
-    session.pop("email_verified", None)
-    session.pop("verified_email", None)
+    session.clear()           # remove ALL session data
+    session.modified = True   # force regeneration
     return redirect(url_for("index"))
+
 
 
 @app.route("/activate/<token>")
