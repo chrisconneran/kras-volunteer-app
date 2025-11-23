@@ -1282,7 +1282,9 @@ def update_status(app_id):
             if not row:
                 return jsonify({"error": "Application not found"}), 404
 
-            history_raw = row[0] or "[]"
+            # FIX: RealDictCursor returns dict, not tuple
+            history_raw = row.get("history") or "[]"
+
             try:
                 history_list = json.loads(history_raw)
             except json.JSONDecodeError:
@@ -1306,7 +1308,6 @@ def update_status(app_id):
             conn.commit()
 
     return jsonify({"message": "Status updated successfully"})
-
 
 
 @app.route("/delete_application/<int:app_id>", methods=["POST"])
@@ -1655,8 +1656,9 @@ def add_note(app_id):
             if not row:
                 return jsonify({"error": "Application not found"}), 404
 
-            history_raw = row[0] or "[]"
-            notes_raw = row[1] or "[]"
+            # FIX: RealDictCursor returns dict keys, not tuple indices
+            history_raw = row.get("history") or "[]"
+            notes_raw = row.get("notes") or "[]"
 
             try:
                 history_list = json.loads(history_raw)
@@ -1691,7 +1693,8 @@ def add_note(app_id):
             )
             conn.commit()
 
-    return jsonify({"message": "Note added successfully."})
+    return jsonify({"message": "Note added successfully"})
+
 
 
 
