@@ -341,6 +341,12 @@
                 <select class="form-select form-select-sm championSelect"
                         data-opportunity-id="{{ opp.id }}">
                   <option value="">Select a Champion...</option>
+
+                  {% for champ in champion_candidates %}
+                    <option value="{{ champ.id }}">
+                      {{ champ.name }} ({{ champ.email }})
+                    </option>
+                  {% endfor %}
                 </select>
 
                 <button class="btn btn-primary btn-sm mt-2 assignChampionBtn"

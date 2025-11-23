@@ -618,6 +618,7 @@ def manage():
 
     with get_db_connection() as conn:
         with conn.cursor() as cur:
+            # Load open opportunities
             cur.execute(
                 "SELECT * FROM opportunities WHERE closed IS FALSE OR closed IS NULL"
             )
@@ -640,7 +641,52 @@ def manage():
 
         opp["frequency"] = opp.get("mode", "")
 
-    return render_template("manage.html", opportunities=opportunities)
+    # ================================
+    # NEW CODE: Load Champion-Leader candidates
+    # ================================
+
+    champion_candidates = []
+
+    # 1. Find the opportunity_id for Champion-Leader
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT id
+                FROM opportunities
+                WHERE LOWER(title) = LOWER(%s)
+                  AND (closed IS FALSE OR closed IS NULL)
+                LIMIT 1
+            """, ("Champion-Leader",))
+            row = cur.fetchone()
+            champion_leader_opp_id = row["id"] if row else None
+
+    # 2. Load all volunteers whose Champion-Leader applications are Assigned
+    if champion_leader_opp_id:
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT id, first_name, last_name, email
+                    FROM applications
+                    WHERE opportunity_id = %s
+                      AND status = 'Assigned'
+                    ORDER BY first_name, last_name
+                """, (champion_leader_opp_id,))
+                rows = cur.fetchall()
+
+                for r in rows:
+                    champion_candidates.append({
+                        "id": r["id"],
+                        "name": f"{r['first_name']} {r['last_name']}",
+                        "email": r["email"]
+                    })
+
+    # ================================
+
+    return render_template(
+        "manage.html",
+        opportunities=opportunities,
+        champion_candidates=champion_candidates
+    )
 
 
 # =====
