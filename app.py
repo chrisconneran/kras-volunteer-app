@@ -1602,7 +1602,8 @@ def view_applications(opp_id):
         applicants.append(a)
 
     # Back button routing
-    back_to_menu_url = url_for("menu") if session.get("admin_verified") else url_for("index")
+    back_to_menu_url = url_for("manage")
+
 
     return render_template(
         "view_applications.html",
