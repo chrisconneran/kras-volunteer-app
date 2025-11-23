@@ -667,10 +667,11 @@ def manage():
                 cur.execute("""
                     SELECT id, first_name, last_name, email
                     FROM applications
-                    WHERE opportunity_id = %s
-                      AND status = 'Assigned'
+                    WHERE status = 'Assigned'
+                        AND LOWER(TRIM(title)) = LOWER(TRIM('Champion-Leader'))
                     ORDER BY first_name, last_name
-                """, (champion_leader_opp_id,))
+                """)
+
                 rows = cur.fetchall()
 
                 for r in rows:
