@@ -138,6 +138,7 @@
           {% endif %}
           <div class="applicant-item"
                data-id="{{ a.id }}"
+               data-opp-id="{{ opportunity.id }}"
                data-name="{{ a.first_name }} {{ a.last_name }}"
                data-email="{{ a.email }}"
                data-status="{{ a.status }}"
@@ -183,6 +184,15 @@
 
     const items = document.querySelectorAll(".applicant-item");
     const panel = document.getElementById("detailPanel");
+
+    function buildUrlWithOppId(base, appId) {
+      let url = base + appId;
+      if (currentItem && currentItem.dataset.oppId) {
+        const oppId = currentItem.dataset.oppId;
+        url += "?opp_id=" + encodeURIComponent(oppId);
+      }
+      return url;
+    }
 
     function buildDetailPanel(item) {
       const historyList = JSON.parse(item.dataset.history || "[]");
@@ -299,11 +309,11 @@
       }
       const newStatus = selectEl.value;
 
-      fetch("/update_status/" + id, {
+      const url = buildUrlWithOppId("/update_status/", id);
+
+      fetch(url, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8"
-        },
+        headers: { "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8" },
         body: new URLSearchParams({ status: newStatus })
       })
       .then(async r => {
@@ -353,11 +363,11 @@
         return;
       }
 
-      fetch("/add_note/" + id, {
+      const url = buildUrlWithOppId("/add_note/", id);
+
+      fetch(url, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8"
-        },
+        headers: { "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8" },
         body: new URLSearchParams({ note: text })
       })
       .then(async r => {

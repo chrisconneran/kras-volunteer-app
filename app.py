@@ -1244,8 +1244,10 @@ def update_status(app_id):
     Champions:
         can update only applications for opportunities they champion
     """
-    # Figure out which opportunity this application belongs to
-    opp_id = get_opportunity_id_for_application(app_id)
+    # Prefer explicit opp_id from the front end, fall back to lookup by title
+    opp_id = request.args.get("opp_id", type=int)
+    if opp_id is None:
+        opp_id = get_opportunity_id_for_application(app_id)
 
     # Permission check
     can_manage = False
@@ -1260,7 +1262,6 @@ def update_status(app_id):
     new_status = request.form.get("status", "Pending")
     ts = datetime.now().strftime("%Y-%m-%d %H:%M")
 
-    # Allow new status types
     allowed_statuses = {
         "Pending",
         "Assigned",
@@ -1268,10 +1269,8 @@ def update_status(app_id):
         "Closed-Not Assigned"
     }
 
-    # Protect against invalid data coming from the form
     if new_status not in allowed_statuses:
         new_status = "Pending"
-
 
     with get_db_connection() as conn:
         with conn.cursor() as cur:
@@ -1629,8 +1628,10 @@ def add_note(app_id):
     if not note_text:
         return jsonify({"error": "Note cannot be empty."}), 400
 
-    # Determine related opportunity
-    opp_id = get_opportunity_id_for_application(app_id)
+    # Prefer explicit opp_id from the front end, fall back to lookup
+    opp_id = request.args.get("opp_id", type=int)
+    if opp_id is None:
+        opp_id = get_opportunity_id_for_application(app_id)
 
     # Permission check
     can_manage = False
@@ -1675,7 +1676,7 @@ def add_note(app_id):
 
             history_list.append(
                 {
-                    "event": "Admin or champion note added",
+                    "event": f"Note added: {note_text}",
                     "timestamp": ts,
                 }
             )
@@ -1691,6 +1692,7 @@ def add_note(app_id):
             conn.commit()
 
     return jsonify({"message": "Note added successfully."})
+
 
 
 
