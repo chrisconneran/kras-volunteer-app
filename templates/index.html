@@ -589,13 +589,73 @@
           });
         }
       }
-      // Step 3 fix: auto-refresh volunteer data after back button returns with ?verified=1
-      if (window.location.search.includes("verified=1")) {
-          const savedEmail = ($("#email").val() || "").trim().toLowerCase();
-          if (savedEmail) {
-              checkStatus(savedEmail);
-          }
-      }
+      // Auto-refresh volunteer data after returning from Manage My Champion Opportunity
+if (window.location.search.includes("verified=1")) {
+
+    // Get email from localStorage first
+    let stored = null;
+    try {
+        stored = JSON.parse(localStorage.getItem("krasVolunteer"));
+    } catch(e){}
+
+    let email = stored && stored.email
+        ? stored.email.trim().toLowerCase()
+        : $("#check_email").val().trim().toLowerCase();
+
+    if (email) {
+        $.get("/check", { email: email }, function(resp) {
+            // Do the same UI refresh your verification block already performs
+            $("#check_email").val(resp.email || "").prop("readonly", true);
+            $("#check_first").val(resp.first_name || "").prop("readonly", true);
+            $("#check_last").val(resp.last_name || "").prop("readonly", true);
+            $("#check_phone").val(resp.phone || "").prop("readonly", true);
+
+            $("#form_first").val(resp.first_name || "");
+            $("#form_last").val(resp.last_name || "");
+            $("#form_email").val(resp.email || "").prop("readonly", true);
+            $("#form_phone").val(resp.phone || "");
+
+            // Rebuild assignment tables
+            const body = $("#assignmentsBody");
+            body.empty();
+
+            if (resp.assignments && resp.assignments.length > 0) {
+                resp.assignments.forEach(function(a) {
+                    body.append(
+                      "<tr>" +
+                        "<td>" + (a.submitted_at || "") + "</td>" +
+                        "<td>" + (a.title || "") + "</td>" +
+                        "<td>" + (a.status || "") + "</td>" +
+                        "<td>" + (a.time_commitment || "") + "</td>" +
+                        "<td>" + (a.frequency || "") + "</td>" +
+                        "<td>" + (a.location || "") + "</td>" +
+                      "</tr>"
+                    );
+                });
+                $("#assignmentsContainer").removeClass("d-none");
+            }
+
+            // Rebuild champion assignments
+            const champBody = $("#championAssignmentsBody");
+            champBody.empty();
+
+            if (resp.champion_assignments && resp.champion_assignments.length > 0) {
+                resp.champion_assignments.forEach(function(c) {
+                    champBody.append(
+                      "<tr>" +
+                        "<td>" + c.title + "</td>" +
+                        "<td><a href=\"/view_applications/" + c.opp_id + "\" class=\"btn btn-primary btn-sm\">Manage My Champion Opportunity</a></td>" +
+                      "</tr>"
+                    );
+                });
+                $("#championAssignmentsContainer").removeClass("d-none");
+            }
+
+            unlockAllSections();
+        });
+    }
+}
+
 
       $(".apply-btn").on("click", function() {
         if (params.get("verified") !== "1") {
