@@ -41,7 +41,7 @@
     .applicant-item:hover {
       background-color: #eef5ff;
     }
-    .selected {
+    .applicant-item.selected {
       background-color: #dbeafe !important;
     }
     #detailPanel {
@@ -54,6 +54,28 @@
       padding: 8px;
       margin-bottom: 5px;
     }
+    .status-badge {
+      border-radius: 999px;
+      padding: 2px 8px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+    .status-pending {
+      background-color: #fff3cd;
+      color: #856404;
+    }
+    .status-assigned {
+      background-color: #d4edda;
+      color: #155724;
+    }
+    .status-closed_completed {
+      background-color: #e2e3e5;
+      color: #383d41;
+    }
+    .status-closed_not_assigned {
+      background-color: #f8d7da;
+      color: #721c24;
+    }
   </style>
 </head>
 
@@ -63,7 +85,7 @@
 
     <div class="header-box d-flex justify-content-between align-items-center">
       <div class="d-flex align-items-center gap-3">
-        <img src="{{ url_for('static', filename='kras_logo.png') }}" class="logo">
+        <img src="{{ url_for('static', filename='kras_logo.png') }}" class="logo" alt="KRAS Kickers">
         <div>
           <h3 class="fw-bold text-primary mb-0">View Applicants</h3>
           <div class="text-muted">Review volunteers who applied for this opportunity</div>
@@ -106,6 +128,14 @@
           <h6 class="fw-bold mb-2">Applicants</h6>
 
           {% for a in applicants %}
+          {% set status_class = "status-pending" %}
+          {% if a.status == "Assigned" %}
+            {% set status_class = "status-assigned" %}
+          {% elif a.status == "Closed-Completed" %}
+            {% set status_class = "status-closed_completed" %}
+          {% elif a.status == "Closed-Not Assigned" %}
+            {% set status_class = "status-closed_not_assigned" %}
+          {% endif %}
           <div class="applicant-item"
                data-id="{{ a.id }}"
                data-name="{{ a.first_name }} {{ a.last_name }}"
@@ -121,7 +151,9 @@
                data-notes='{{ a.notes|tojson }}'>
             <div class="fw-semibold">{{ a.first_name }} {{ a.last_name }}</div>
             <div class="small text-muted">{{ a.email }}</div>
-            <div class="small"><b>Status:</b> {{ a.status }}</div>
+            <div class="small mt-1">
+              <span class="badge status-badge {{ status_class }}">{{ a.status }}</span>
+            </div>
           </div>
           {% endfor %}
 
@@ -136,18 +168,23 @@
 
   </div>
 
-<script>
-  const items = document.querySelectorAll('.applicant-item');
-  const panel = document.getElementById('detailPanel');
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
-  items.forEach(item => {
-    item.addEventListener('click', () => {
+  <script>
+    function mapStatusClass(status) {
+      if (status === "Assigned") return "status-assigned";
+      if (status === "Closed-Completed") return "status-closed_completed";
+      if (status === "Closed-Not Assigned") return "status-closed_not_assigned";
+      return "status-pending";
+    }
 
-      document.querySelectorAll('.applicant-item')
-              .forEach(el => el.classList.remove('selected'));
+    let currentItem = null;
+    let confirmModalInstance = null;
 
-      item.classList.add('selected');
+    const items = document.querySelectorAll(".applicant-item");
+    const panel = document.getElementById("detailPanel");
 
+    function buildDetailPanel(item) {
       const historyList = JSON.parse(item.dataset.history || "[]");
       const notesList = JSON.parse(item.dataset.notes || "[]");
 
@@ -174,8 +211,20 @@
         });
       }
 
+      const statusClass = mapStatusClass(item.dataset.status);
+
       panel.innerHTML = `
-        <h5 class="fw-bold mb-3">${item.dataset.name}</h5>
+        <div class="d-flex align-items-center justify-content-between mb-3">
+          <div class="d-flex align-items-center gap-2">
+            <h5 class="fw-bold mb-0">${item.dataset.name}</h5>
+            <span class="badge status-badge ${statusClass}" id="detailStatusBadge">
+              ${item.dataset.status}
+            </span>
+          </div>
+          <div class="text-muted small">
+            Selected applicant
+          </div>
+        </div>
 
         <div><b>Email:</b> ${item.dataset.email}</div>
         <div><b>Preferred Contact:</b> ${item.dataset.contact}</div>
@@ -189,28 +238,27 @@
 
         <hr>
 
-        <div><b>Comments:</b><br>${item.dataset.comments || 'None'}</div>
+        <div><b>Comments:</b><br>${item.dataset.comments || "None"}</div>
 
         <hr>
 
         <label class="fw-bold mt-3">Status</label>
-        <select id="statusSelect" class="form-select" style="max-width:220px">
-          <option ${item.dataset.status === 'Pending' ? 'selected' : ''}>Pending</option>
-          <option ${item.dataset.status === 'Assigned' ? 'selected' : ''}>Assigned</option>
-          <option ${item.dataset.status === 'Closed-Completed' ? 'selected' : ''}>Closed-Completed</option>
-          <option ${item.dataset.status === 'Closed-Not Assigned' ? 'selected' : ''}>Closed-Not Assigned</option>
-        </select>
+        <div class="d-flex align-items-center gap-2 mb-3" style="max-width:260px;">
+          <select id="statusSelect" class="form-select">
+            <option ${item.dataset.status === "Pending" ? "selected" : ""}>Pending</option>
+            <option ${item.dataset.status === "Assigned" ? "selected" : ""}>Assigned</option>
+            <option ${item.dataset.status === "Closed-Completed" ? "selected" : ""}>Closed-Completed</option>
+            <option ${item.dataset.status === "Closed-Not Assigned" ? "selected" : ""}>Closed-Not Assigned</option>
+          </select>
+          <button class="btn btn-primary" onclick="saveStatus(${item.dataset.id})">
+            Update Status
+          </button>
+        </div>
 
-        <button class="btn btn-primary mt-2" onclick="saveStatus(${item.dataset.id})">
-          Update Status
-        </button>
+        <h6 class="fw-bold mt-2">Notes</h6>
+        <div id="notesBox" class="mb-2">${notesHtml}</div>
 
-        <hr>
-
-        <h6 class="fw-bold mt-3">Notes</h6>
-        <div id="notesBox">${notesHtml}</div>
-
-        <textarea id="newNote" class="form-control mt-2" placeholder="Add a note..."></textarea>
+        <textarea id="newNote" class="form-control" placeholder="Add a note..."></textarea>
         <button class="btn btn-success btn-sm mt-2" onclick="saveNote(${item.dataset.id})">Add Note</button>
 
         <hr>
@@ -218,41 +266,156 @@
         <h6 class="fw-bold">History</h6>
         <div id="historyBox">${historyHtml}</div>
       `;
-    });
-  });
-
-  function saveStatus(id) {
-    const newStatus = document.getElementById('statusSelect').value;
-
-    fetch('/update_status/' + id, {
-      method: 'POST',
-      body: new URLSearchParams({ status: newStatus })
-    })
-    .then(r => r.json())
-    .then(() => {
-      alert('Status updated!');
-      location.reload();
-    });
-  }
-
-  function saveNote(id) {
-    const text = document.getElementById('newNote').value.trim();
-    if (!text) {
-      alert('Please enter a note first.');
-      return;
     }
 
-    fetch('/add_note/' + id, {
-      method: 'POST',
-      body: new URLSearchParams({ note: text })
-    })
-    .then(r => r.json())
-    .then(() => {
-      alert('Note added!');
-      location.reload();
+    items.forEach(item => {
+      item.addEventListener("click", () => {
+        document.querySelectorAll(".applicant-item")
+                .forEach(el => el.classList.remove("selected"));
+
+        item.classList.add("selected");
+        currentItem = item;
+        buildDetailPanel(item);
+      });
     });
-  }
-</script>
+
+    function showConfirmModal(message) {
+      const bodyEl = document.getElementById("confirmModalBody");
+      if (bodyEl) {
+        bodyEl.textContent = message;
+      }
+      if (confirmModalInstance) {
+        confirmModalInstance.show();
+      } else {
+        alert(message);
+      }
+    }
+
+    function saveStatus(id) {
+      const selectEl = document.getElementById("statusSelect");
+      if (!selectEl) {
+        showConfirmModal("Cannot find status selector.");
+        return;
+      }
+      const newStatus = selectEl.value;
+
+      fetch("/update_status/" + id, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8"
+        },
+        body: new URLSearchParams({ status: newStatus })
+      })
+      .then(async r => {
+        const data = await r.json().catch(() => ({}));
+        if (!r.ok || data.error) {
+          showConfirmModal(data.error || "Unable to update status.");
+          return;
+        }
+
+        if (currentItem) {
+          currentItem.dataset.status = newStatus;
+          const listBadge = currentItem.querySelector(".status-badge");
+          if (listBadge) {
+            listBadge.textContent = newStatus;
+            listBadge.className = "badge status-badge " + mapStatusClass(newStatus);
+          }
+        }
+
+        const detailBadge = document.getElementById("detailStatusBadge");
+        if (detailBadge) {
+          detailBadge.textContent = newStatus;
+          detailBadge.className = "badge status-badge " + mapStatusClass(newStatus);
+        }
+
+        const historyBox = document.getElementById("historyBox");
+        if (historyBox) {
+          const now = new Date();
+          const ts = now.toISOString().slice(0, 16).replace("T", " ");
+          const div = document.createElement("div");
+          div.className = "small mb-1";
+          div.innerHTML = "<b>" + ts + "</b> — Status updated to " + newStatus;
+          historyBox.prepend(div);
+        }
+
+        showConfirmModal("Status updated.");
+      })
+      .catch(() => {
+        showConfirmModal("Unexpected error updating status.");
+      });
+    }
+
+    function saveNote(id) {
+      const textArea = document.getElementById("newNote");
+      const text = textArea ? textArea.value.trim() : "";
+      if (!text) {
+        showConfirmModal("Please enter a note first.");
+        return;
+      }
+
+      fetch("/add_note/" + id, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8"
+        },
+        body: new URLSearchParams({ note: text })
+      })
+      .then(async r => {
+        const data = await r.json().catch(() => ({}));
+        if (!r.ok || data.error) {
+          showConfirmModal(data.error || "Unable to add note.");
+          return;
+        }
+
+        const notesBox = document.getElementById("notesBox");
+        if (notesBox) {
+          const now = new Date();
+          const ts = now.toISOString().slice(0, 16).replace("T", " ");
+          const wrapper = document.createElement("div");
+          wrapper.className = "note-box";
+          wrapper.innerHTML = "<div>" + text + "</div>" +
+                              "<div class=\"small text-muted\">" + ts + "</div>";
+          notesBox.prepend(wrapper);
+        }
+
+        if (textArea) {
+          textArea.value = "";
+        }
+
+        showConfirmModal("Note added.");
+      })
+      .catch(() => {
+        showConfirmModal("Unexpected error adding note.");
+      });
+    }
+
+    document.addEventListener("DOMContentLoaded", function() {
+      const modalEl = document.getElementById("confirmModal");
+      if (modalEl && window.bootstrap) {
+        confirmModalInstance = new bootstrap.Modal(modalEl);
+      }
+
+      const firstItem = document.querySelector(".applicant-item");
+      if (firstItem) {
+        firstItem.click();
+      }
+    });
+  </script>
+
+  <div class="modal fade" id="confirmModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Update Saved</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body" id="confirmModalBody"></div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-primary" data-bs-dismiss="modal">OK</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
 </body>
 </html>
