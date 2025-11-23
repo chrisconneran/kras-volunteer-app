@@ -47,6 +47,13 @@
     #detailPanel {
       min-height: 70vh;
     }
+    .note-box {
+      border: 1px solid #ddd;
+      background: #fff;
+      border-radius: 6px;
+      padding: 8px;
+      margin-bottom: 5px;
+    }
   </style>
 </head>
 
@@ -54,7 +61,6 @@
 
   <div class="container">
 
-    <!-- HEADER -->
     <div class="header-box d-flex justify-content-between align-items-center">
       <div class="d-flex align-items-center gap-3">
         <img src="{{ url_for('static', filename='kras_logo.png') }}" class="logo">
@@ -67,7 +73,6 @@
       <a href="{{ back_to_menu_url }}" class="btn btn-outline-primary btn-sm">Back</a>
     </div>
 
-    <!-- OPPORTUNITY HEADER -->
     <div class="card p-3 mb-4">
       <div class="d-flex align-items-start gap-4">
 
@@ -94,11 +99,9 @@
       </div>
     </div>
 
-    <!-- MAIN TWO-PANEL LAYOUT -->
     <div class="card p-3">
       <div class="row">
 
-        <!-- LEFT PANEL — Applicant list -->
         <div class="col-md-4" id="applicantList">
           <h6 class="fw-bold mb-2">Applicants</h6>
 
@@ -113,8 +116,9 @@
                data-comments="{{ a.comments }}"
                data-time="{{ a.time }}"
                data-duration="{{ a.duration }}"
-               data-location="{{ a.location }}">
-
+               data-location="{{ a.location }}"
+               data-history='{{ a.history|tojson }}'
+               data-notes='{{ a.notes|tojson }}'>
             <div class="fw-semibold">{{ a.first_name }} {{ a.last_name }}</div>
             <div class="small text-muted">{{ a.email }}</div>
             <div class="small"><b>Status:</b> {{ a.status }}</div>
@@ -123,7 +127,6 @@
 
         </div>
 
-        <!-- RIGHT PANEL — Detail panel -->
         <div class="col-md-8 ps-4" id="detailPanel">
           <div class="text-muted">Select an applicant to view full details.</div>
         </div>
@@ -145,31 +148,75 @@
 
       item.classList.add('selected');
 
+      const historyList = JSON.parse(item.dataset.history || "[]");
+      const notesList = JSON.parse(item.dataset.notes || "[]");
+
+      let historyHtml = "";
+      historyList.forEach(h => {
+        historyHtml += `
+          <div class="small mb-1">
+            <b>${h.timestamp}</b> — ${h.event}
+          </div>
+        `;
+      });
+
+      let notesHtml = "";
+      if (notesList.length === 0) {
+        notesHtml = `<div class="text-muted small">No notes yet.</div>`;
+      } else {
+        notesList.forEach(n => {
+          notesHtml += `
+            <div class="note-box">
+              <div>${n.note}</div>
+              <div class="small text-muted">${n.timestamp}</div>
+            </div>
+          `;
+        });
+      }
+
       panel.innerHTML = `
         <h5 class="fw-bold mb-3">${item.dataset.name}</h5>
+
         <div><b>Email:</b> ${item.dataset.email}</div>
         <div><b>Preferred Contact:</b> ${item.dataset.contact}</div>
         <div><b>Phone:</b> ${item.dataset.phone}</div>
+
         <hr>
+
         <div><b>Time:</b> ${item.dataset.time}</div>
         <div><b>Duration:</b> ${item.dataset.duration}</div>
         <div><b>Location:</b> ${item.dataset.location}</div>
+
         <hr>
+
         <div><b>Comments:</b><br>${item.dataset.comments || 'None'}</div>
 
         <hr>
+
         <label class="fw-bold mt-3">Status</label>
-        <select id="statusSelect" class="form-select" style="max-width:200px">
+        <select id="statusSelect" class="form-select" style="max-width:220px">
           <option ${item.dataset.status === 'Pending' ? 'selected' : ''}>Pending</option>
-          <option ${item.dataset.status === 'Approved' ? 'selected' : ''}>Approved</option>
-          <option ${item.dataset.status === 'Rejected' ? 'selected' : ''}>Rejected</option>
-          <option ${item.dataset.status === 'Completed' ? 'selected' : ''}>Completed</option>
+          <option ${item.dataset.status === 'Assigned' ? 'selected' : ''}>Assigned</option>
+          <option ${item.dataset.status === 'Closed-Completed' ? 'selected' : ''}>Closed-Completed</option>
+          <option ${item.dataset.status === 'Closed-Not Assigned' ? 'selected' : ''}>Closed-Not Assigned</option>
         </select>
 
-        <button class="btn btn-primary mt-3"
-                onclick="saveStatus(${item.dataset.id})">
-          Save
+        <button class="btn btn-primary mt-2" onclick="saveStatus(${item.dataset.id})">
+          Update Status
         </button>
+
+        <hr>
+
+        <h6 class="fw-bold mt-3">Notes</h6>
+        <div id="notesBox">${notesHtml}</div>
+
+        <textarea id="newNote" class="form-control mt-2" placeholder="Add a note..."></textarea>
+        <button class="btn btn-success btn-sm mt-2" onclick="saveNote(${item.dataset.id})">Add Note</button>
+
+        <hr>
+
+        <h6 class="fw-bold">History</h6>
+        <div id="historyBox">${historyHtml}</div>
       `;
     });
   });
@@ -177,14 +224,31 @@
   function saveStatus(id) {
     const newStatus = document.getElementById('statusSelect').value;
 
-    fetch('/update_application_status/' + id, {
+    fetch('/update_status/' + id, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: newStatus })
+      body: new URLSearchParams({ status: newStatus })
     })
     .then(r => r.json())
     .then(() => {
       alert('Status updated!');
+      location.reload();
+    });
+  }
+
+  function saveNote(id) {
+    const text = document.getElementById('newNote').value.trim();
+    if (!text) {
+      alert('Please enter a note first.');
+      return;
+    }
+
+    fetch('/add_note/' + id, {
+      method: 'POST',
+      body: new URLSearchParams({ note: text })
+    })
+    .then(r => r.json())
+    .then(() => {
+      alert('Note added!');
       location.reload();
     });
   }
