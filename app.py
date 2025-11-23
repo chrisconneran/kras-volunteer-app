@@ -1534,9 +1534,7 @@ def view_applications(opp_id):
       Lets the JS panel load applicant details dynamically
     """
     # AUTH: Admins can view any opportunity
-    if session.get("admin_verified"):
-        pass
-    else:
+    if not session.get("admin_verified"):
         # Champions must be assigned
         if not user_is_champion_for_opportunity(opp_id):
             return redirect(url_for("index"))
@@ -1544,7 +1542,7 @@ def view_applications(opp_id):
     with get_db_connection() as conn:
         with conn.cursor() as cur:
 
-            # Get the opportunity (image, title, etc.)
+            # Load opportunity
             cur.execute("""
                 SELECT id, title, time, duration, mode, description,
                        requirements, location, image, tags, closed, closed_date
@@ -1556,21 +1554,21 @@ def view_applications(opp_id):
             if not row:
                 return "Opportunity not found", 404
 
-            # Correct dict construction
             opportunity = dict(row)
             if "description" in opportunity:
                 opportunity["desc"] = opportunity["description"]
 
-            # Normalize tags → list
+            # Parse tags JSON
+            tags_raw = opportunity.get("tags")
             try:
-                if opportunity["tags"]:
-                    opportunity["tags"] = json.loads(opportunity["tags"])
+                if tags_raw:
+                    opportunity["tags"] = json.loads(tags_raw)
                 else:
                     opportunity["tags"] = []
             except:
                 opportunity["tags"] = []
 
-            # Now fetch applicants tied to this opportunity
+            # Load applicants
             cur.execute("""
                 SELECT id, first_name, last_name, email, phone, contact,
                        title, time, duration, mode, location,
@@ -1581,13 +1579,29 @@ def view_applications(opp_id):
                 )
                 ORDER BY timestamp DESC
             """, (opp_id,))
-            applicants_raw = cur.fetchall()
+            raw_rows = cur.fetchall()
 
-    # Convert rows to dicts correctly
     applicants = []
-    for a in applicants_raw:
-        applicants.append(dict(a))
+    for r in raw_rows:
+        a = dict(r)
 
+        # Parse history JSON
+        history_raw = a.get("history") or "[]"
+        try:
+            a["history"] = json.loads(history_raw)
+        except:
+            a["history"] = []
+
+        # Parse notes JSON
+        notes_raw = a.get("notes") or "[]"
+        try:
+            a["notes"] = json.loads(notes_raw)
+        except:
+            a["notes"] = []
+
+        applicants.append(a)
+
+    # Back button routing
     back_to_menu_url = url_for("menu") if session.get("admin_verified") else url_for("index")
 
     return render_template(
@@ -1596,7 +1610,6 @@ def view_applications(opp_id):
         applicants=applicants,
         back_to_menu_url=back_to_menu_url
     )
-
 
 # =====
 # Admin notes
