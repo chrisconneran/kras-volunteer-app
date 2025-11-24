@@ -293,7 +293,7 @@
               <div class="opportunity-content">
                 {% if opp.image_base64 %}
                   <img src="data:image/png;base64,{{ opp.image_base64 }}" alt="{{ opp.title }}">
-                {% endif %}
+                  {% endif %}
                 <div class="flex-grow-1">
                   <div class="card-title-row">
                     <div class="card-title mb-0">
@@ -306,7 +306,7 @@
                       {% if opp.tags %}
                         {% for tag in opp.tags %}
                           <span class="badge-tag" style="background-color: {{ tag.color }}">{{ tag.name }}</span>
-                        {% endfor %}
+                        {% endfor %}  
                       {% endif %}
                     </div>
                   </div>
@@ -325,7 +325,7 @@
               </div>
 
               <div class="d-flex justify-content-between align-items-center mt-2">
-                <a href="{{ url_for('view_applications', opp_id=opp.id) }}" class="btn btn-outline-dark btn-sm">View Applicants</a>
+               <a href="{{ url_for('view_applications', opp_id=opp.id) }}" class="btn btn-outline-dark btn-sm">View Applicants</a>
                 <div class="d-flex gap-2">
                   <!-- Always allow Edit -->
                   <button class="btn btn-outline-primary btn-sm edit-btn"
@@ -335,18 +335,18 @@
                   </button>
 
                   {% if opp.title != "Champion-Leader" %}
-                    <!-- Only show Delete & Close on non-Champion-Leader -->
-                    <button class="btn btn-outline-danger btn-sm delete-btn" data-id="{{ opp.id }}">
-                      Delete
-                    </button>
+                      <!-- Only show Delete & Close on non-Champion-Leader -->
+                      <button class="btn btn-outline-danger btn-sm delete-btn" data-id="{{ opp.id }}">
+                        Delete
+                      </button>
 
-                    <button class="btn btn-outline-success btn-sm close-btn" data-id="{{ opp.id }}">
-                      Close
-                    </button>
+                      <button class="btn btn-outline-success btn-sm close-btn" data-id="{{ opp.id }}">
+                        Close
+                      </button>
                   {% endif %}
                 </div>
-              </div>
 
+              </div>
               <!-- ⭐ CHAMPION ASSIGNMENT UI ⭐ -->
               <div class="mt-3 p-2 border rounded bg-light">
                 <label class="fw-semibold small">Assign a Champion</label>
@@ -354,6 +354,7 @@
                 <select class="form-select form-select-sm championSelect"
                         data-opportunity-id="{{ opp.id }}">
                   <option value="">Select a Champion...</option>
+
                   {% for champ in champion_candidates %}
                     <option value="{{ champ.id }}">
                       {{ champ.name }} ({{ champ.email }})
@@ -367,7 +368,7 @@
                 </button>
 
                 <div class="assignedChampions mt-2 small"
-                     data-opportunity-id="{{ opp.id }}">
+                    data-opportunity-id="{{ opp.id }}">
                   Loading assigned champions...
                 </div>
               </div>
@@ -379,7 +380,6 @@
       </div>
     </div>
 
-    <!-- Edit Opportunity Modal -->
     <div class="modal fade" id="editModal" tabindex="-1" aria-hidden="true">
       <div class="modal-dialog modal-lg modal-dialog-centered">
         <div class="modal-content">
@@ -460,7 +460,7 @@
                 </div>
               </div>
               <div class="text-end mt-3">
-                <button class="btn btn.success">Save Changes</button>
+                <button class="btn btn-success">Save Changes</button>
               </div>
             </form>
           </div>
@@ -468,37 +468,7 @@
       </div>
     </div>
 
-    <!-- Remove Champion Confirmation Modal -->
-    <div class="modal fade" id="removeChampionModal" tabindex="-1" aria-hidden="true">
-      <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-          <div class="modal-header bg-danger text-white">
-            <h5 class="modal-title">Remove Champion</h5>
-            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-          </div>
-          <div class="modal-body">
-            <p id="removeChampionText"></p>
-          </div>
-          <div class="modal-footer">
-            <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-            <button class="btn btn-danger" id="confirmRemoveChampionBtn">Remove Champion</button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- UNDO TOAST -->
-    <div class="toast-container position-fixed bottom-0 end-0 p-3">
-      <div id="undoToast" class="toast align-items-center text-bg-success border-0" role="alert">
-        <div class="d-flex">
-          <div class="toast-body" id="undoToastBody"></div>
-          <button type="button" class="btn btn-light btn-sm ms-3" id="undoBtn">Undo</button>
-        </div>
-      </div>
-    </div>
-
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-
     <script>
       let tags = [];
       let editTags = [];
@@ -697,6 +667,7 @@
                 </div>`;
             });
             container.html(html);
+
           });
         });   
       }
@@ -723,84 +694,118 @@
         });
       });
 
-      loadChampionList();
-      loadAssignedChampions();
+  loadChampionList();
+loadAssignedChampions();
+//------------------------------------------------------------
+//  REMOVE CHAMPION (with modal)
+//------------------------------------------------------------
+let pendingRemoval = null;
 
-      //------------------------------------------------------------
-      //  REMOVE CHAMPION (with modal)
-      //------------------------------------------------------------
-      let pendingRemoval = null;
+$(document).on("click", ".removeChampionBtn", function() {
+  pendingRemoval = {
+    championId: $(this).data("champion-id"),
+    oppId: $(this).data("opportunity-id"),
+    name: $(this).data("champion-name"),
+    email: $(this).data("champion-email")
+  };
 
-      $(document).on("click", ".removeChampionBtn", function() {
-        pendingRemoval = {
-          championId: $(this).data("champion-id"),
-          oppId: $(this).data("opportunity-id"),
-          name: $(this).data("champion-name"),
-          email: $(this).data("champion-email")
-        };
+  $("#removeChampionText").html(
+    `Are you sure you want to remove <b>${pendingRemoval.name}</b> (${pendingRemoval.email}) from this opportunity?`
+  );
 
-        $("#removeChampionText").html(
-          `Are you sure you want to remove <b>${pendingRemoval.name}</b> (${pendingRemoval.email}) from this opportunity?`
-        );
+  const modal = new bootstrap.Modal(document.getElementById("removeChampionModal"));
+  modal.show();
+});
 
-        const modal = new bootstrap.Modal(document.getElementById("removeChampionModal"));
-        modal.show();
-      });
 
-      // Confirm removal
-      $(document).on("click", "#confirmRemoveChampionBtn", function() {
-        if (!pendingRemoval) return;
+// Confirm removal
+$(document).on("click", "#confirmRemoveChampionBtn", function() {
+  if (!pendingRemoval) return;
 
-        $.post("/api/remove_champion", {
-          champion_id: pendingRemoval.championId,
-          opportunity_id: pendingRemoval.oppId
-        }, function(resp) {
+  $.post("/api/remove_champion", {
+    champion_id: pendingRemoval.championId,
+    opportunity_id: pendingRemoval.oppId
+  }, function(resp) {
 
-          showUndoToast(pendingRemoval);
+    showUndoToast(pendingRemoval);
 
-          loadAssignedChampions();
-          loadChampionList();
-        });
+    loadAssignedChampions();
+    loadChampionList();
+  });
 
-        pendingRemoval = null;
-        bootstrap.Modal.getInstance(document.getElementById("removeChampionModal")).hide();
-      });
+  pendingRemoval = null;
+  bootstrap.Modal.getInstance(document.getElementById("removeChampionModal")).hide();
+});
 
-      /* ------------------------------
-         UNDO TOAST + UNDO FUNCTIONALITY
-         ------------------------------ */
+</script>
 
-      let lastRemoval = null;
+<script>
+/* ------------------------------
+   UNDO TOAST + UNDO FUNCTIONALITY
+   ------------------------------ */
 
-      // Show toast
-      function showUndoToast(data) {
-        lastRemoval = data;
+let lastRemoval = null;
 
-        $("#undoToastBody").html(
-          `${data.name} (${data.email}) was removed.`
-        );
+// Show toast
+function showUndoToast(data) {
+  lastRemoval = data;
 
-        const toast = new bootstrap.Toast(document.getElementById("undoToast"));
-        toast.show();
-      }
+  $("#undoToastBody").html(
+    `${data.name} (${data.email}) was removed.`
+  );
 
-      // Undo button
-      $("#undoBtn").click(function() {
-        if (!lastRemoval) return;
+  const toast = new bootstrap.Toast(document.getElementById("undoToast"));
+  toast.show();
+}
 
-        $.post("/api/assign_champion", {
-          champion_id: lastRemoval.championId,
-          opportunity_id: lastRemoval.oppId
-        }, function(resp) {
+// Undo button
+$("#undoBtn").click(function() {
+  if (!lastRemoval) return;
 
-          alert(`${lastRemoval.name} has been restored as champion.`);
+  $.post("/api/assign_champion", {
+    champion_id: lastRemoval.championId,
+    opportunity_id: lastRemoval.oppId
+  }, function(resp) {
 
-          loadAssignedChampions();
-          loadChampionList();
-        });
+    alert(`${lastRemoval.name} has been restored as champion.`);
 
-        lastRemoval = null;
-      });
-    </script>
-  </body>
+    loadAssignedChampions();
+    loadChampionList();
+  });
+
+  lastRemoval = null;
+});
+</script>
+
+
+<!-- REMOVE CHAMPION CONFIRMATION MODAL -->
+<div class="modal fade" id="removeChampionModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header bg-danger text-white">
+        <h5 class="modal-title">Remove Champion</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p id="removeChampionText"></p>
+      </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button class="btn btn-danger" id="confirmRemoveChampionBtn">Remove Champion</button>
+        </div>
+    </div> <!-- end modal-content -->
+  </div> <!-- end modal-dialog -->
+</div> <!-- end modal -->
+
+<!-- UNDO TOAST -->
+<div class="toast-container position-fixed bottom-0 end-0 p-3">
+  <div id="undoToast" class="toast align-items-center text-bg-success border-0" role="alert">
+    <div class="d-flex">
+      <div class="toast-body" id="undoToastBody"></div>
+      <button type="button" class="btn btn-light btn-sm ms-3" id="undoBtn">Undo</button>
+    </div>
+  </div>
+</div>
+
+</body>
 </html>
