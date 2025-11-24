@@ -347,7 +347,7 @@
                 </div>
               </div>
 
-              <!-- Champion assignment UI -->
+              <!-- ⭐ CHAMPION ASSIGNMENT UI ⭐ -->
               <div class="mt-3 p-2 border rounded bg-light">
                 <label class="fw-semibold small">Assign a Champion</label>
 
@@ -371,7 +371,7 @@
                   Loading assigned champions...
                 </div>
               </div>
-              <!-- End champion UI -->
+              <!-- ⭐ END CHAMPION UI ⭐ -->
             </div>
           </div>
           {% endfor %}
@@ -726,6 +726,71 @@
       loadChampionList();
       loadAssignedChampions();
 
+function refreshOpportunityRow(oppId) {
+
+  // Refresh dropdown candidates
+  loadChampionList();
+
+  // Refresh assigned champions for this specific card
+  $.get("/api/opportunity_champions/" + oppId, function(list) {
+
+    const container = $(`.assignedChampions[data-opportunity-id='${oppId}']`);
+    if (!container.length) return;
+
+    if (list.length === 0) {
+      container.html("<span class='text-muted'>No champions assigned.</span>");
+    } else {
+      let html = "";
+      list.forEach(c => {
+        html += `
+          <div class="d-flex justify-content-between align-items-center mb-1">
+            <div>
+              <b>${c.first_name} ${c.last_name}</b>
+              <span class="text-muted">(${c.email})</span>
+            </div>
+            <button 
+              class="btn btn-sm btn-outline-danger removeChampionBtn"
+              data-champion-id="${c.id}"
+              data-champion-name="${c.first_name} ${c.last_name}"
+              data-champion-email="${c.email}"
+              data-opportunity-id="${oppId}">
+              Remove Champion
+            </button>
+          </div>`;
+      });
+      container.html(html);
+    }
+  });
+
+  // Refresh the opportunity card metadata (title, tags, etc.)
+  $.get("/api/opportunity/" + oppId, function(updated) {
+
+    const card = $(`div.opportunity-card[data-id='${oppId}']`);
+    if (!card.length) return;
+
+    let tagsHtml = "";
+    if (updated.tags && updated.tags.length > 0) {
+      updated.tags.forEach(t => {
+        tagsHtml += `<span class="badge-tag" style="background-color:${t.color}">${t.name}</span>`;
+      });
+    }
+
+    card.find(".card-title").text(updated.title);
+    card.find(".small-text:nth-of-type(1)").html(`<b>Time Commitment:</b> ${updated.time}`);
+    card.find(".small-text:nth-of-type(2)").html(`<b>Duration:</b> ${updated.duration}`);
+    card.find(".small-text:nth-of-type(3)").html(`<b>Frequency:</b> ${updated.mode}`);
+    card.find(".small-text:nth-of-type(4)").html(`<b>Location:</b> ${updated.location}`);
+
+    card.find(".tag-box-inline").html(tagsHtml);
+
+    if (updated.image_base64) {
+      card.find("img").attr("src", "data:image/png;base64," + updated.image_base64);
+    }
+  });
+    loadAssignedChampions();
+}
+
+
       //------------------------------------------------------------
       //  REMOVE CHAMPION (with modal)
       //------------------------------------------------------------
@@ -747,7 +812,7 @@
         modal.show();
       });
 
-      // Confirm removal
+           // Confirm removal
       $(document).on("click", "#confirmRemoveChampionBtn", function() {
         if (!pendingRemoval) return;
 
@@ -758,14 +823,14 @@
 
           showUndoToast(pendingRemoval);
 
-          // Refresh all assigned champions and dropdowns
-          loadAssignedChampions();
-          loadChampionList();
+          // Auto-refresh the UI for this opportunity
+          refreshOpportunityRow(pendingRemoval.oppId);
         });
 
         pendingRemoval = null;
         bootstrap.Modal.getInstance(document.getElementById("removeChampionModal")).hide();
       });
+
 
       /* ------------------------------
          UNDO TOAST + UNDO FUNCTIONALITY
@@ -804,65 +869,66 @@
       });
     </script>
 
-    <!-- Deluxe Professional Footer -->
-    <footer style="
-        margin-top: 40px;
-        background: linear-gradient(135deg, #f7f9fc 0%, #eef2f8 100%);
-        border-top: 1px solid #d9e2ef;
-        padding: 25px 0;
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+<!-- Deluxe Professional Footer -->
+<footer style="
+    margin-top: 40px;
+    background: linear-gradient(135deg, #f7f9fc 0%, #eef2f8 100%);
+    border-top: 1px solid #d9e2ef;
+    padding: 25px 0;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+">
+  <div style="max-width: 1200px; margin: 0 auto; text-align: center;">
+    
+    <!-- Company name with accent underline -->
+    <div style="
+        font-size: 1rem;
+        font-weight: 700;
+        color: #1f2937;
+        display: inline-block;
+        position: relative;
+        padding-bottom: 4px;
     ">
-      <div style="max-width: 1200px; margin: 0 auto; text-align: center;">
-        
-        <!-- Company name with accent underline -->
-        <div style="
-            font-size: 1rem;
-            font-weight: 700;
-            color: #1f2937;
-            display: inline-block;
-            position: relative;
-            padding-bottom: 4px;
-        ">
-          Designed by Hubs.Design
-          <span style="
-              position: absolute;
-              bottom: 0;
-              left: 50%;
-              transform: translateX(-50%);
-              width: 60%;
-              height: 3px;
-              background: #2563eb;
-              border-radius: 2px;
-          "></span>
-        </div>
+      Designed by Hubs.Design
+      <span style="
+          position: absolute;
+          bottom: 0;
+          left: 50%;
+          transform: translateX(-50%);
+          width: 60%;
+          height: 3px;
+          background: #2563eb;
+          border-radius: 2px;
+      "></span>
+    </div>
 
-        <!-- Subtext -->
-        <div style="
-            margin-top: 12px;
-            font-size: 0.82rem;
-            color: #4b5563;
-        ">
-          Crafting thoughtful digital experiences for organizations making a difference.
-        </div>
+    <!-- Subtext -->
+    <div style="
+        margin-top: 12px;
+        font-size: 0.82rem;
+        color: #4b5563;
+    ">
+      Crafting thoughtful digital experiences for organizations making a difference.
+    </div>
 
-        <!-- Divider line -->
-        <div style="
-            margin: 18px auto 10px;
-            width: 80px;
-            height: 1px;
-            background-color: #cbd5e1;
-        "></div>
+    <!-- Divider line -->
+    <div style="
+        margin: 18px auto 10px;
+        width: 80px;
+        height: 1px;
+        background-color: #cbd5e1;
+    "></div>
 
-        <!-- Copyright -->
-        <div style="
-            font-size: 0.78rem;
-            color: #6b7280;
-        ">
-          © <script>document.write(new Date().getFullYear())</script> Hubs.Design. All rights reserved.
-        </div>
+    <!-- Copyright -->
+    <div style="
+        font-size: 0.78rem;
+        color: #6b7280;
+    ">
+      © <script>document.write(new Date().getFullYear())</script> Hubs.Design. All rights reserved.
+    </div>
 
-      </div>
-    </footer>
+  </div>
+</footer>
+
 
   </body>
 </html>
