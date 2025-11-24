@@ -291,9 +291,9 @@
           <div class="col-md-6">
             <div class="opportunity-card card-hover shadow-sm">
               <div class="opportunity-content">
-                {% if opp.image %}
-                <img src="{{ url_for('static', filename=opp.image) }}" alt="{{ opp.title }}">
-                {% endif %}
+                {% if opp.image_base64 %}
+                  <img src="data:image/png;base64,{{ opp.image_base64 }}" alt="{{ opp.title }}">
+                  {% endif %}
                 <div class="flex-grow-1">
                   <div class="card-title-row">
                     <div class="card-title mb-0">
@@ -306,7 +306,7 @@
                       {% if opp.tags %}
                         {% for tag in opp.tags %}
                           <span class="badge-tag" style="background-color: {{ tag.color }}">{{ tag.name }}</span>
-                        {% endfor %}
+                        {% endfor %}  
                       {% endif %}
                     </div>
                   </div>

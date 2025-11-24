@@ -445,8 +445,8 @@
               {% for opp in opportunities %}
               <div class="opportunity-card">
                 <div class="opportunity-content">
-                  {% if opp.image %}
-                  <img src="{{ url_for('static', filename=opp.image) }}" alt="{{ opp.title }} image">
+                  {% if opp.image_base64 %}
+                    <img src="data:image/png;base64,{{ opp.image_base64 }}" alt="{{ opp.title }}" class="opp-image">
                   {% endif %}
                   <div class="flex-grow-1">
                     <div class="card-title-row">

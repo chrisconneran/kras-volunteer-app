@@ -98,11 +98,13 @@
     <div class="card p-3 mb-4">
       <div class="d-flex align-items-start gap-4">
 
-        {% if opportunity.image %}
-          <img src="{{ url_for('static', filename=opportunity.image) }}"
-               class="opp-image"
-               alt="{{ opportunity.title }}">
+        {% if opportunity.image_base64 %}
+          <img src="data:image/png;base64,{{ opportunity.image_base64 }}"
+              class="opp-image"
+              alt="{{ opportunity.title }}">
         {% endif %}
+
+
 
         <div>
           <h5 class="fw-bold">{{ opportunity.title }}</h5>

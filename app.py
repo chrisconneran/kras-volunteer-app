@@ -10,6 +10,9 @@ from psycopg.rows import dict_row
 from itsdangerous import URLSafeTimedSerializer
 from werkzeug.utils import secure_filename
 
+import base64
+
+
 
 # =====
 # Flask app setup
@@ -786,18 +789,18 @@ def add_opportunity():
     if auth:
         return auth
 
-    image_path = ""
+    image_base64 = None
     if "image" in request.files:
         file = request.files["image"]
         if file and allowed_file(file.filename):
-            filename = secure_filename(file.filename).replace(" ", "_").lower()
-            file.save(os.path.join(app.config["UPLOAD_FOLDER"], filename))
-            image_path = filename
+            encoded = base64.b64encode(file.read()).decode("utf-8")
+            image_base64 = encoded
+
 
     tags_json = request.form.get("tags_json") or request.form.get("tags") or "[]"
     try:
         tags = json.loads(tags_json)
-    except Exception:
+    except Exception:   
         tags = []
     tags_json = json.dumps(tags)
 
@@ -806,11 +809,8 @@ def add_opportunity():
             cur.execute(
                 """
                 INSERT INTO opportunities
-                    (title, time, duration, mode, description,
-                     requirements, location, image, tags, closed)
-                VALUES
-                    (%s, %s, %s, %s, %s,
-                     %s,           %s,       %s,   %s,   FALSE)
+                (title, time, duration, mode, description, requirements, location, image_base64, tags, closed)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, FALSE)
                 """,
                 (
                     request.form.get("title"),
@@ -820,7 +820,7 @@ def add_opportunity():
                     request.form.get("desc", ""),
                     request.form.get("requirements", ""),
                     request.form.get("location", ""),
-                    image_path if image_path else "default.png",
+                    image_base64,
                     tags_json,
                 ),
             )
@@ -872,19 +872,21 @@ def update_opportunity(opp_id):
                 ),
             )
 
+            import base64   # ← ensure this is at the top of app.py
+
+            # inside update_opportunity() – replace your whole image block with this:
             if "image" in request.files:
                 file = request.files["image"]
                 if file and allowed_file(file.filename):
-                    filename = (
-                        secure_filename(file.filename).replace(" ", "_").lower()
-                    )
-                    file.save(os.path.join(app.config["UPLOAD_FOLDER"], filename))
+                    encoded = base64.b64encode(file.read()).decode("utf-8")
                     cur.execute(
-                        "UPDATE opportunities SET image = %s WHERE id = %s",
-                        (filename, opp_id),
+                        "UPDATE opportunities SET image_base64 = %s WHERE id = %s",
+                        (encoded, opp_id),
                     )
 
-    return jsonify({"message": "Opportunity updated."})
+
+
+    return jsonify({"message": "Opportunity updated."}) 
 
 
 # =====
@@ -898,9 +900,14 @@ def delete_opportunity(opp_id):
 
     with get_db_connection() as conn:
         with conn.cursor() as cur:
-            cur.execute("DELETE FROM opportunities WHERE id = %s", (opp_id,))
+            cur.execute("""
+                UPDATE opportunities
+                SET closed = TRUE, closed_date = NOW()
+                WHERE id = %s
+            """, (opp_id,))
 
-    return jsonify({"message": "Opportunity deleted"})
+    return jsonify({"message": "Opportunity closed."})
+
 
 
 # =====
@@ -1039,7 +1046,7 @@ def view_applicants(opp_id):
         with conn.cursor() as cur:
             cur.execute(
                 "SELECT id, title, time, duration, mode, description, requirements, "
-                "location, image, tags, closed, closed_date "
+                "location, image_base64, tags, closed, closed_date "
                 "FROM opportunities WHERE id = %s",
                 (opp_id,),
             )
@@ -1615,7 +1622,7 @@ def view_applications(opp_id):
             # Load opportunity
             cur.execute("""
                 SELECT id, title, time, duration, mode, description,
-                       requirements, location, image, tags, closed, closed_date
+                       requirements, location, image_base64, tags, closed, closed_date
                 FROM opportunities
                 WHERE id = %s
             """, (opp_id,))
