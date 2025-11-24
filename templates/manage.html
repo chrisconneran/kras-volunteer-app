@@ -722,6 +722,45 @@ $("#confirmRemoveChampionBtn").click(function() {
 });
 </script>
 
+<script>
+/* ------------------------------
+   UNDO TOAST + UNDO FUNCTIONALITY
+   ------------------------------ */
+
+let lastRemoval = null;
+
+// Show toast
+function showUndoToast(data) {
+  lastRemoval = data;
+
+  $("#undoToastBody").html(
+    `${data.name} (${data.email}) was removed.`
+  );
+
+  const toast = new bootstrap.Toast(document.getElementById("undoToast"));
+  toast.show();
+}
+
+// Undo button
+$("#undoBtn").click(function() {
+  if (!lastRemoval) return;
+
+  $.post("/api/assign_champion", {
+    champion_id: lastRemoval.championId,
+    opportunity_id: lastRemoval.oppId
+  }, function(resp) {
+
+    alert(`${lastRemoval.name} has been restored as champion.`);
+
+    loadAssignedChampions();
+    loadChampionList();
+  });
+
+  lastRemoval = null;
+});
+</script>
+
+
 <!-- REMOVE CHAMPION CONFIRMATION MODAL -->
 <div class="modal fade" id="removeChampionModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
