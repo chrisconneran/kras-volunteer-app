@@ -646,8 +646,10 @@
                   <button 
                     class="btn btn-sm btn-outline-danger removeChampionBtn"
                     data-champion-id="${c.id}"
+                    data-champion-name="${c.first_name} ${c.last_name}"
+                    data-champion-email="${c.email}"
                     data-opportunity-id="${oppId}">
-                    Remove
+                    Remove Champion
                   </button>
                 </div>`;
             });
@@ -679,23 +681,74 @@
         });
       });
 
-      loadChampionList();
-      loadAssignedChampions();
-      
-    </script>
-  </body>
-</html>
+  loadChampionList();
+loadAssignedChampions();
 //------------------------------------------------------------
-//  REMOVE CHAMPION FROM OPPORTUNITY
+//  REMOVE CHAMPION (with modal)
 //------------------------------------------------------------
+let pendingRemoval = null;
+
 $(document).on("click", ".removeChampionBtn", function() {
-  const championId = $(this).data("champion-id");
-  const oppId = $(this).data("opportunity-id");
+  pendingRemoval = {
+    championId: $(this).data("champion-id"),
+    oppId: $(this).data("opportunity-id"),
+    name: $(this).data("champion-name"),
+    email: $(this).data("champion-email")
+  };
 
-  if (!confirm("Remove this champion from the opportunity?")) return;
+  $("#removeChampionText").html(
+    `Are you sure you want to remove <b>${pendingRemoval.name}</b> (${pendingRemoval.email}) from this opportunity?`
+  );
 
-  $.post("/api/remove_champion", { champion_id: championId, opportunity_id: oppId }, function(resp) {
-    alert(resp.message);
-    loadAssignedChampions();
-  });
+  const modal = new bootstrap.Modal(document.getElementById("removeChampionModal"));
+  modal.show();
 });
+
+// Confirm removal
+// Confirm removal
+$("#confirmRemoveChampionBtn").click(function() {
+  if (!pendingRemoval) return;
+
+  $.post("/api/remove_champion", pendingRemoval, function(resp) {
+
+    showUndoToast(pendingRemoval);
+
+    loadAssignedChampions();
+    loadChampionList();  // refresh dropdown list
+  });
+
+  pendingRemoval = null;
+  bootstrap.Modal.getInstance(document.getElementById("removeChampionModal")).hide();
+});
+</script>
+
+<!-- REMOVE CHAMPION CONFIRMATION MODAL -->
+<div class="modal fade" id="removeChampionModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header bg-danger text-white">
+        <h5 class="modal-title">Remove Champion</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p id="removeChampionText"></p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+      </div> <!-- end modal-footer -->
+    </div> <!-- end modal-content -->
+  </div> <!-- end modal-dialog -->
+</div> <!-- end modal -->
+
+<!-- UNDO TOAST -->
+<div class="toast-container position-fixed bottom-0 end-0 p-3">
+  <div id="undoToast" class="toast align-items-center text-bg-success border-0" role="alert">
+    <div class="d-flex">
+      <div class="toast-body" id="undoToastBody"></div>
+      <button type="button" class="btn btn-light btn-sm ms-3" id="undoBtn">Undo</button>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
