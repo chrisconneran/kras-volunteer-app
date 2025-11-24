@@ -913,31 +913,36 @@ def close_opportunity(opp_id):
 
     with get_db_connection() as conn:
         with conn.cursor() as cur:
-            # 1. Close the opportunity
+
+            # 1. Mark the opportunity as closed
             cur.execute("""
                 UPDATE opportunities
                 SET closed = TRUE, closed_date = %s
                 WHERE id = %s
             """, (closed_date, opp_id))
 
-            # 2. Remove champion assignments
+            # 2. Close volunteer applications tied to this opportunity
+            cur.execute("""
+                UPDATE applications
+                SET status = 'Closed-Completed'
+                WHERE LOWER(TRIM(title)) = LOWER(
+                    TRIM((SELECT title FROM opportunities WHERE id = %s))
+                )
+                AND status IN ('Assigned', 'Pending')
+            """, (opp_id,))
+
+            # 3. Remove all champions from this opportunity
             cur.execute("""
                 DELETE FROM champions_opportunities
                 WHERE opportunity_id = %s
             """, (opp_id,))
 
-            # 3. Update all volunteer applications linked to this opportunity
-            cur.execute("""
-                UPDATE applications
-                SET status = 'Closed-Not Assigned'
-                WHERE title = (
-                    SELECT title FROM opportunities WHERE id = %s
-                )
-                AND status IN ('Pending', 'Assigned')
-            """, (opp_id,))
+        conn.commit()
 
+    return jsonify({
+        "message": "Opportunity closed. All assigned volunteers have been closed out and all champions removed."
+    })
 
-    return jsonify({"message": "Opportunity marked as closed."})
 
 @app.route("/api/remove_champion", methods=["POST"])
 def remove_champion():
