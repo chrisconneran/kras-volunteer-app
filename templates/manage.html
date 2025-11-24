@@ -289,7 +289,7 @@
         <div id="opportunityList" class="row g-3">
           {% for opp in opportunities if not opp.get('closed') %}
           <div class="col-md-6">
-            <div class="opportunity-card card-hover shadow-sm">
+            <div class="opportunity-card card-hover shadow-sm" data-id="{{ opp.id }}">
               <div class="opportunity-content">
                 {% if opp.image_base64 %}
                   <img src="data:image/png;base64,{{ opp.image_base64 }}" alt="{{ opp.title }}">
