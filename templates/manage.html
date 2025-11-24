@@ -726,14 +726,43 @@
       loadChampionList();
       loadAssignedChampions();
 
-       // Refresh the specific opportunity row
-      function refreshOpportunityRow(oppId) {
+function refreshOpportunityRow(oppId) {
 
-  // Refresh champion lists and dropdowns
-  loadAssignedChampions();
+  // Refresh dropdown candidates
   loadChampionList();
 
-  // Reload the single opportunity card (force re-render)
+  // Refresh assigned champions for this specific card
+  $.get("/api/opportunity_champions/" + oppId, function(list) {
+
+    const container = $(`.assignedChampions[data-opportunity-id='${oppId}']`);
+    if (!container.length) return;
+
+    if (list.length === 0) {
+      container.html("<span class='text-muted'>No champions assigned.</span>");
+    } else {
+      let html = "";
+      list.forEach(c => {
+        html += `
+          <div class="d-flex justify-content-between align-items-center mb-1">
+            <div>
+              <b>${c.first_name} ${c.last_name}</b>
+              <span class="text-muted">(${c.email})</span>
+            </div>
+            <button 
+              class="btn btn-sm btn-outline-danger removeChampionBtn"
+              data-champion-id="${c.id}"
+              data-champion-name="${c.first_name} ${c.last_name}"
+              data-champion-email="${c.email}"
+              data-opportunity-id="${oppId}">
+              Remove Champion
+            </button>
+          </div>`;
+      });
+      container.html(html);
+    }
+  });
+
+  // Refresh the opportunity card metadata (title, tags, etc.)
   $.get("/api/opportunity/" + oppId, function(updated) {
 
     const card = $(`div.opportunity-card[data-id='${oppId}']`);
@@ -746,24 +775,20 @@
       });
     }
 
-    card.find(".assignedChampions").html("<span class='text-muted'>Refreshing...</span>");
-
-    // Replace title, fields, image, etc.
     card.find(".card-title").text(updated.title);
     card.find(".small-text:nth-of-type(1)").html(`<b>Time Commitment:</b> ${updated.time}`);
     card.find(".small-text:nth-of-type(2)").html(`<b>Duration:</b> ${updated.duration}`);
     card.find(".small-text:nth-of-type(3)").html(`<b>Frequency:</b> ${updated.mode}`);
     card.find(".small-text:nth-of-type(4)").html(`<b>Location:</b> ${updated.location}`);
 
-    // Tags
     card.find(".tag-box-inline").html(tagsHtml);
 
-    // Image
     if (updated.image_base64) {
       card.find("img").attr("src", "data:image/png;base64," + updated.image_base64);
     }
   });
 }
+
 
       //------------------------------------------------------------
       //  REMOVE CHAMPION (with modal)
