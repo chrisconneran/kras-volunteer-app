@@ -704,22 +704,26 @@ $(document).on("click", ".removeChampionBtn", function() {
   modal.show();
 });
 
-// Confirm removal
+
 // Confirm removal
 $("#confirmRemoveChampionBtn").click(function() {
   if (!pendingRemoval) return;
 
-  $.post("/api/remove_champion", pendingRemoval, function(resp) {
+  $.post("/api/remove_champion", {
+    champion_id: pendingRemoval.championId,
+    opportunity_id: pendingRemoval.oppId
+  }, function(resp) {
 
     showUndoToast(pendingRemoval);
 
     loadAssignedChampions();
-    loadChampionList();  // refresh dropdown list
+    loadChampionList();
   });
 
   pendingRemoval = null;
   bootstrap.Modal.getInstance(document.getElementById("removeChampionModal")).hide();
 });
+
 </script>
 
 <script>
