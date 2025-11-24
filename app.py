@@ -894,17 +894,7 @@ def update_opportunity(opp_id):
 # =====
 @app.route("/delete/<int:opp_id>", methods=["POST"])
 def delete_opportunity(opp_id):
-    auth = require_admin()
-    if auth:
-        return auth
-
-    with get_db_connection() as conn:
-        with conn.cursor() as cur:
-            cur.execute("""
-                UPDATE opportunities
-                SET closed = TRUE, closed_date = NOW()
-                WHERE id = %s
-            """, (opp_id,))
+    return close_opportunity(opp_id)
 
     return jsonify({"message": "Opportunity closed."})
 
@@ -923,16 +913,48 @@ def close_opportunity(opp_id):
 
     with get_db_connection() as conn:
         with conn.cursor() as cur:
-            cur.execute(
-                """
+            # 1. Close the opportunity
+            cur.execute("""
                 UPDATE opportunities
                 SET closed = TRUE, closed_date = %s
                 WHERE id = %s
-                """,
-                (closed_date, opp_id),
-            )
+            """, (closed_date, opp_id))
+
+            # 2. Remove champion assignments
+            cur.execute("""
+                DELETE FROM champions_opportunities
+                WHERE opportunity_id = %s
+            """, (opp_id,))
+
+            # 3. Update all volunteer applications linked to this opportunity
+            cur.execute("""
+                UPDATE applications
+                SET status = 'Closed-Not Assigned'
+                WHERE title = (
+                    SELECT title FROM opportunities WHERE id = %s
+                )
+                AND status IN ('Pending', 'Assigned')
+            """, (opp_id,))
+
 
     return jsonify({"message": "Opportunity marked as closed."})
+
+@app.route("/api/remove_champion", methods=["POST"])
+def remove_champion():
+    if not session.get("admin_verified"):
+        return jsonify({"error": "Not authorized"}), 403
+
+    champion_id = request.form.get("champion_id")
+    opportunity_id = request.form.get("opportunity_id")
+
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                DELETE FROM champions_opportunities
+                WHERE champion_id = %s AND opportunity_id = %s
+            """, (champion_id, opportunity_id))
+
+    return jsonify({"message": "Champion removed."})
 
 
 @app.route("/reopen_opportunity/<int:opp_id>", methods=["POST"])

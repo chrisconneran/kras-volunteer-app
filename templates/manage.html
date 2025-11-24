@@ -637,14 +637,24 @@
 
             let html = "";
             list.forEach(c => {
-              html += `<div>
-                         <b>${c.first_name} ${c.last_name}</b>
-                         <span class="text-muted">(${c.email})</span>
-                       </div>`;
+              html += `
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                  <div>
+                    <b>${c.first_name} ${c.last_name}</b>
+                    <span class="text-muted">(${c.email})</span>
+                  </div>
+                  <button 
+                    class="btn btn-sm btn-outline-danger removeChampionBtn"
+                    data-champion-id="${c.id}"
+                    data-opportunity-id="${oppId}">
+                    Remove
+                  </button>
+                </div>`;
             });
             container.html(html);
+
           });
-        });
+        });   
       }
 
       //------------------------------------------------------------
@@ -675,3 +685,17 @@
     </script>
   </body>
 </html>
+//------------------------------------------------------------
+//  REMOVE CHAMPION FROM OPPORTUNITY
+//------------------------------------------------------------
+$(document).on("click", ".removeChampionBtn", function() {
+  const championId = $(this).data("champion-id");
+  const oppId = $(this).data("opportunity-id");
+
+  if (!confirm("Remove this champion from the opportunity?")) return;
+
+  $.post("/api/remove_champion", { champion_id: championId, opportunity_id: oppId }, function(resp) {
+    alert(resp.message);
+    loadAssignedChampions();
+  });
+});
