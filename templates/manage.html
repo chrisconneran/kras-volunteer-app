@@ -885,54 +885,40 @@ function refreshOpportunityRow(oppId) {
     margin-top: 40px;
     background: linear-gradient(135deg, #f7f9fc 0%, #eef2f8 100%);
     border-top: 1px solid #d9e2ef;
-    padding: 35px 0 25px;
+    padding: 35px 0;
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 ">
   <div style="max-width: 1200px; margin: 0 auto; text-align: center;">
 
-    <!-- Powered by Logo -->
-    <div style="margin-bottom: 15px;">
-      <img 
-        src="/mnt/data/Hubs Powered 2400 x 1200.png"
-        alt="Powered by Hubs.Design"
-        style="max-width: 260px; width: 45%; height: auto;"
-      >
+    <!-- LOGO SECTION -->
+    <div style="margin-bottom: 18px;">
+      <img src="{{ url_for('static', filename='hubs_powered.png') }}"
+           alt="Powered by Hubs.Design"
+           style="height: 80px;">
     </div>
 
-    <!-- Company name with accent underline -->
+    <!-- POWERED BY TEXT -->
     <div style="
-        font-size: 1rem;
+        font-size: 1.05rem;
         font-weight: 700;
-        color: #1f2937;
-        display: inline-block;
-        position: relative;
-        padding-bottom: 4px;
+        color: #111827;
+        margin-top: 8px;
     ">
-      Designed by Hubs.Design
-      <span style="
-          position: absolute;
-          bottom: 0;
-          left: 50%;
-          transform: translateX(-50%);
-          width: 60%;
-          height: 3px;
-          background: #2563eb;
-          border-radius: 2px;
-      "></span>
+      <strong>Powered by Hubs.Design</strong>
     </div>
 
     <!-- Subtext -->
     <div style="
-        margin-top: 12px;
+        margin-top: 10px;
         font-size: 0.82rem;
         color: #4b5563;
     ">
       Crafting thoughtful digital experiences for organizations making a difference.
     </div>
 
-    <!-- Divider line -->
+    <!-- Divider -->
     <div style="
-        margin: 18px auto 10px;
+        margin: 20px auto 12px;
         width: 80px;
         height: 1px;
         background-color: #cbd5e1;
@@ -948,6 +934,7 @@ function refreshOpportunityRow(oppId) {
 
   </div>
 </footer>
+
 
   </div>
 </footer>
