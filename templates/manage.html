@@ -726,6 +726,45 @@
       loadChampionList();
       loadAssignedChampions();
 
+       // Refresh the specific opportunity row
+      function refreshOpportunityRow(oppId) {
+
+  // Refresh champion lists and dropdowns
+  loadAssignedChampions();
+  loadChampionList();
+
+  // Reload the single opportunity card (force re-render)
+  $.get("/api/opportunity/" + oppId, function(updated) {
+
+    const card = $(`div.opportunity-card[data-id='${oppId}']`);
+    if (!card.length) return;
+
+    let tagsHtml = "";
+    if (updated.tags && updated.tags.length > 0) {
+      updated.tags.forEach(t => {
+        tagsHtml += `<span class="badge-tag" style="background-color:${t.color}">${t.name}</span>`;
+      });
+    }
+
+    card.find(".assignedChampions").html("<span class='text-muted'>Refreshing...</span>");
+
+    // Replace title, fields, image, etc.
+    card.find(".card-title").text(updated.title);
+    card.find(".small-text:nth-of-type(1)").html(`<b>Time Commitment:</b> ${updated.time}`);
+    card.find(".small-text:nth-of-type(2)").html(`<b>Duration:</b> ${updated.duration}`);
+    card.find(".small-text:nth-of-type(3)").html(`<b>Frequency:</b> ${updated.mode}`);
+    card.find(".small-text:nth-of-type(4)").html(`<b>Location:</b> ${updated.location}`);
+
+    // Tags
+    card.find(".tag-box-inline").html(tagsHtml);
+
+    // Image
+    if (updated.image_base64) {
+      card.find("img").attr("src", "data:image/png;base64," + updated.image_base64);
+    }
+  });
+}
+
       //------------------------------------------------------------
       //  REMOVE CHAMPION (with modal)
       //------------------------------------------------------------
@@ -739,7 +778,7 @@
           email: $(this).data("champion-email")
         };
 
-        $("#removeChampionText").html(
+        $("#removeChampionText").html(      
           `Are you sure you want to remove <b>${pendingRemoval.name}</b> (${pendingRemoval.email}) from this opportunity?`
         );
 
@@ -747,7 +786,7 @@
         modal.show();
       });
 
-      // Confirm removal
+           // Confirm removal
       $(document).on("click", "#confirmRemoveChampionBtn", function() {
         if (!pendingRemoval) return;
 
@@ -758,13 +797,14 @@
 
           showUndoToast(pendingRemoval);
 
-          loadAssignedChampions();
-          loadChampionList();
+          // Auto-refresh the UI for this opportunity
+          refreshOpportunityRow(pendingRemoval.oppId);
         });
 
         pendingRemoval = null;
         bootstrap.Modal.getInstance(document.getElementById("removeChampionModal")).hide();
       });
+
 
       /* ------------------------------
          UNDO TOAST + UNDO FUNCTIONALITY
