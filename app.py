@@ -961,6 +961,44 @@ def remove_champion():
 
     return jsonify({"message": "Champion removed."})
 
+@app.route("/api/opportunity/<int:opp_id>", methods=["GET"])
+def api_get_opportunity(opp_id):
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT id, title, time, duration, mode, location,
+                       requirements, desc, tags, image_base64
+                FROM opportunities
+                WHERE id = %s
+            """, (opp_id,))
+            row = cur.fetchone()
+
+            if not row:
+                return jsonify({"error": "Opportunity not found"}), 404
+
+            # Parse tags if stored as JSON string
+            tags = []
+            if row[8]:
+                try:
+                    parsed = json.loads(row[8])
+                    if isinstance(parsed, list):
+                        tags = parsed
+                except Exception:
+                    tags = []
+
+            return jsonify({
+                "id": row[0],
+                "title": row[1],
+                "time": row[2],
+                "duration": row[3],
+                "mode": row[4],
+                "location": row[5],
+                "requirements": row[6],
+                "desc": row[7],
+                "tags": tags,
+                "image_base64": row[9]
+            })
+
 
 @app.route("/reopen_opportunity/<int:opp_id>", methods=["POST"])
 def reopen_opportunity(opp_id):
