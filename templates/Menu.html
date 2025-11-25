@@ -113,15 +113,13 @@
         document.getElementById("menuOptions").classList.remove("locked");
       }
 
-      const params = new URLSearchParams(window.location.search);
-
-      // If admin_verified=1 is in the URL, unlock the menu
-      if (params.get("admin_verified") === "1") {
+      // SERVER-SIDE CHECK: admin_verified
+      {% if session.get("admin_verified") %}
         unlockMenu();
         document.getElementById("adminLoginPanel").style.display = "none";
-      } else {
+      {% else %}
         lockMenu();
-      }
+      {% endif %}
 
       // SEND ADMIN VERIFICATION REQUEST — INSTANT MESSAGE VERSION
       document.getElementById("adminSendBtn").addEventListener("click", function() {
@@ -133,11 +131,9 @@
           return;
         }
 
-        // Show INSTANT feedback (before server responds)
         msgBox.innerHTML =
           "<span style='color:#2563eb; font-weight:600;'>Sending login link… check your inbox.</span>";
 
-        // Send request in background
         fetch("/admin_request_access", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -156,6 +152,7 @@
         });
       });
     </script>
+
     <!-- Deluxe Professional Footer -->
 <footer style="
     margin-top: 40px;
