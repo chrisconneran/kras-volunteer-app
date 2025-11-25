@@ -1188,11 +1188,15 @@ def view_applicants(opp_id):
     # Back button behavior:
     # Admins go back to the admin menu
     # Champions go back to the main volunteer page
-    back_to_menu_url = (
-    url_for("menu") if session.get("admin_verified") else url_for("index", verified=1)
-    )
+    # Admins go back to manage page
+    # Champions / volunteers go back to volunteer dashboard
+    if session.get("admin_verified"):
+        back_to_menu_url = url_for("manage")
+    else:
+        back_to_menu_url = url_for("index", verified=1)
 
     is_champion_view = not session.get("admin_verified")
+
 
     return render_template(
         "applicants.html",
