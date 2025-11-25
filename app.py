@@ -419,7 +419,7 @@ def send_volunteer_confirmation_email(app_data, opportunity):
         <div style="border:1px solid #ddd; padding:15px; border-radius:8px; margin-top:20px;">
 
         <!-- Opportunity Image -->
-        {f'<img src="data:image/png;base64,{opportunity.get("image_base64","")}" style="width:200px;border-radius:6px;margin-bottom:15px;">' if opportunity.get("image_base64") else ''}
+        ''''
 
         <h3 style="margin:0; color:#111;">{opportunity.get("title", app_data["title"])}</h3>
 
@@ -654,27 +654,45 @@ def index():
         if opportunity:
             opportunity = dict(opportunity)
 
-        # 2. Send email to volunteer
+        # ===== ASYNC EMAIL SENDING =====
+import threading
+
+def async_send_emails(app_data, opportunity):
+    try:
         send_volunteer_confirmation_email(app_data, opportunity)
+    except Exception:
+        pass
 
-        # 3. Notify champion(s), if any
-        with get_db_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    SELECT a.first_name, a.last_name, a.email
-                    FROM champions_opportunities co
-                    JOIN applications a ON co.champion_id = a.id
-                    JOIN opportunities o ON o.id = co.opportunity_id
-                    WHERE LOWER(TRIM(o.title)) = LOWER(TRIM(%s))
-                """, (app_data.get("title"),))
-                champs = cur.fetchall()
+    # Notify champion(s) if any
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT a.first_name, a.last_name, a.email
+                FROM champions_opportunities co
+                JOIN applications a ON co.champion_id = a.id
+                JOIN opportunities o ON o.id = co.opportunity_id
+                WHERE LOWER(TRIM(o.title)) = LOWER(TRIM(%s))
+            """, (app_data.get("title"),))
+            champs = cur.fetchall()
 
-                for c in champs:
+            for c in champs:
+                try:
                     send_champion_notification_email(
                         app_data,
                         {"first_name": c["first_name"], "last_name": c["last_name"], "email": c["email"]},
                         opportunity
                     )
+                except Exception:
+                    pass
+
+        # fire-and-forget email thread
+        threading.Thread(
+            target=async_send_emails,
+            args=(app_data, opportunity),
+            daemon=True
+        ).start()
+        # ===== END ASYNC EMAIL SENDING =====
+
 
         # 3. Notify champion(s), if any
         with get_db_connection() as conn:
