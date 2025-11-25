@@ -113,12 +113,17 @@
         document.getElementById("menuOptions").classList.remove("locked");
       }
 
-      // SERVER-SIDE CHECK: admin_verified
+      // --- FIX: Session-based unlocking ---
+      // This block runs IMMEDIATELY on page load (no nested script tags)
       {% if session.get("admin_verified") %}
-        unlockMenu();
-        document.getElementById("adminLoginPanel").style.display = "none";
+        window.addEventListener("DOMContentLoaded", function() {
+          unlockMenu();
+          document.getElementById("adminLoginPanel").style.display = "none";
+        });
       {% else %}
-        lockMenu();
+        window.addEventListener("DOMContentLoaded", function() {
+          lockMenu();
+        });
       {% endif %}
 
       // SEND ADMIN VERIFICATION REQUEST — INSTANT MESSAGE VERSION
@@ -154,53 +159,49 @@
     </script>
 
     <!-- Deluxe Professional Footer -->
-<footer style="
-    margin-top: 40px;
-    background: linear-gradient(135deg, #f7f9fc 0%, #eef2f8 100%);
-    border-top: 1px solid #d9e2ef;
-    padding: 35px 0;
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-">
-  <div style="max-width: 1200px; margin: 0 auto; text-align: center;">
-
-    <!-- Powered by text only -->
-    <div style="
-        font-size: 1.1rem;
-        font-weight: 700;
-        color: #111827;
-        margin-bottom: 8px;
+    <footer style="
+        margin-top: 40px;
+        background: linear-gradient(135deg, #f7f9fc 0%, #eef2f8 100%);
+        border-top: 1px solid #d9e2ef;
+        padding: 35px 0;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     ">
-      Powered by
-      <span style="color: #059669;">Hubs.Design</span>
-    </div>
+      <div style="max-width: 1200px; margin: 0 auto; text-align: center;">
 
-    <!-- Subtext -->
-    <div style="
-        margin-top: 6px;
-        font-size: 0.82rem;
-        color: #4b5563;
-    ">
-      Crafting thoughtful digital experiences for organizations making a difference.
-    </div>
+        <div style="
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: #111827;
+            margin-bottom: 8px;
+        ">
+          Powered by
+          <span style="color: #059669;">Hubs.Design</span>
+        </div>
 
-    <!-- Divider -->
-    <div style="
-        margin: 20px auto 12px;
-        width: 80px;
-        height: 1px;
-        background-color: #cbd5e1;
-    "></div>
+        <div style="
+            margin-top: 6px;
+            font-size: 0.82rem;
+            color: #4b5563;
+        ">
+          Crafting thoughtful digital experiences for organizations making a difference.
+        </div>
 
-    <!-- Copyright -->
-    <div style="
-        font-size: 0.78rem;
-        color: #6b7280;
-    ">
-      © <script>document.write(new Date().getFullYear())</script> Hubs.Design. All rights reserved.
-    </div>
+        <div style="
+            margin: 20px auto 12px;
+            width: 80px;
+            height: 1px;
+            background-color: #cbd5e1;
+        "></div>
 
-  </div>
-</footer>
+        <div style="
+            font-size: 0.78rem;
+            color: #6b7280;
+        ">
+          © <script>document.write(new Date().getFullYear())</script> Hubs.Design. All rights reserved.
+        </div>
+
+      </div>
+    </footer>
 
   </body>
 </html>
