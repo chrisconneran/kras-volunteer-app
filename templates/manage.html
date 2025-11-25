@@ -879,7 +879,6 @@ function refreshOpportunityRow(oppId) {
         lastRemoval = null;
       });
     </script>
-
 <!-- Deluxe Professional Footer -->
 <footer style="
     margin-top: 40px;
@@ -890,27 +889,32 @@ function refreshOpportunityRow(oppId) {
 ">
   <div style="max-width: 1200px; margin: 0 auto; text-align: center;">
 
-    <!-- LOGO SECTION -->
-    <div style="margin-bottom: 18px;">
-      <img src="{{ url_for('static', filename='hubs_powered.png') }}"
-           alt="Powered by Hubs.Design"
-           style="height: 80px;">
-    </div>
-
-    <!-- POWERED BY TEXT -->
+    <!-- LOGO + TEXT INLINE ROW -->
     <div style="
-        font-size: 1.05rem;
-        font-weight: 700;
-        color: #111827;
-        margin-top: 8px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 14px;
     ">
-      <strong>Powered by Hubs.Design</strong>
+      <img 
+        src="{{ url_for('static', filename='hubs_powered.svg') }}" 
+        alt="Powered by Hubs.Design"
+        style="height: 42px;"
+      >
+      <span style="
+          font-size: 1.2rem;
+          font-weight: 700;
+          color: #111827;
+      ">
+        Powered by <span style="color:#0ea5a4;">Hubs.Design</span>
+      </span>
     </div>
 
     <!-- Subtext -->
     <div style="
         margin-top: 10px;
-        font-size: 0.82rem;
+        font-size: 0.85rem;
         color: #4b5563;
     ">
       Crafting thoughtful digital experiences for organizations making a difference.
@@ -935,9 +939,6 @@ function refreshOpportunityRow(oppId) {
   </div>
 </footer>
 
-
-  </div>
-</footer>
 
 
   </body>
