@@ -382,6 +382,109 @@ If you did not request this, you can ignore this message.
             server.login(smtp_user, smtp_password)
         server.send_message(msg)
 
+# - Send Volunteer email confirmation
+
+def send_volunteer_confirmation_email(app_data, opportunity):
+    """
+    Sends a confirmation email to the volunteer after they submit an application.
+    """
+    recipient = app_data["email"]
+    subject = f"Thank you for applying to: {app_data['title']}"
+
+    logo_url = url_for("static", filename="kras_logo.png", _external=True)
+
+    html_body = f"""
+    <html>
+      <body style="font-family: Arial, sans-serif; color:#333;">
+        <div style="text-align:center; margin-bottom:20px;">
+          <img src="{logo_url}" alt="KRAS Kickers" style="height:65px;">
+        </div>
+
+        <h2 style="color:#2563eb;">Thank you for applying to volunteer!</h2>
+
+        <p>Dear {app_data['first_name']} {app_data['last_name']},</p>
+
+        <p>We have received your volunteer application for the opportunity:</p>
+
+        <p style="font-size:1.1rem; font-weight:bold;">{app_data['title']}</p>
+
+        <p>
+          A KRAS Kickers coordinator or champion will reach out to you
+          within <strong>48 hours</strong> via your preferred contact method.
+        </p>
+
+        <p style="margin-top:25px;">Warm regards,<br>KRAS Kickers Volunteer Team</p>
+      </body>
+    </html>
+    """
+
+    msg = EmailMessage()
+    msg["Subject"] = subject
+    msg["From"] = os.environ.get("SMTP_FROM", "no-reply@kraskickers.org")
+    msg["To"] = recipient
+    msg.add_alternative(html_body, subtype="html")
+
+    smtp_host = os.environ.get("SMTP_HOST", "localhost")
+    smtp_port = int(os.environ.get("SMTP_PORT", "25"))
+    smtp_user = os.environ.get("SMTP_USER")
+    smtp_password = os.environ.get("SMTP_PASSWORD")
+
+    with smtplib.SMTP(smtp_host, smtp_port) as server:
+        if smtp_user and smtp_password:
+            server.starttls()
+            server.login(smtp_user, smtp_password)
+        server.send_message(msg)
+
+# champion notification email
+def send_champion_notification_email(app_data, champion, opportunity):
+    """
+    Alerts a champion that a new volunteer has applied.
+    """
+    recipient = champion["email"]
+    subject = f"New Volunteer Application for {opportunity['title']}"
+
+    logo_url = url_for("static", filename="kras_logo.png", _external=True)
+
+    html_body = f"""
+    <html>
+      <body style="font-family: Arial, sans-serif; color:#333;">
+        <div style="text-align:center; margin-bottom:20px;">
+          <img src="{logo_url}" alt="KRAS Kickers" style="height:65px;">
+        </div>
+
+        <h2 style="color:#2563eb;">A new volunteer has applied</h2>
+
+        <p>The following volunteer submitted an application for:</p>
+        <p style="font-size:1.1rem; font-weight:bold;">{opportunity['title']}</p>
+
+        <p><strong>Name:</strong> {app_data['first_name']} {app_data['last_name']}<br>
+        <strong>Email:</strong> {app_data['email']}<br>
+        <strong>Phone:</strong> {app_data['phone']}</p>
+
+        <p>Please reach out to this volunteer within <strong>48 hours</strong>.</p>
+
+        <p style="margin-top:25px;">Thank you for serving as a Champion!<br>KRAS Kickers Team</p>
+      </body>
+    </html>
+    """
+
+    msg = EmailMessage()
+    msg["Subject"] = subject
+    msg["From"] = os.environ.get("SMTP_FROM", "no-reply@kraskickers.org")
+    msg["To"] = recipient
+    msg.add_alternative(html_body, subtype="html")
+
+    smtp_host = os.environ.get("SMTP_HOST", "localhost")
+    smtp_port = int(os.environ.get("SMTP_PORT", "25"))
+    smtp_user = os.environ.get("SMTP_USER")
+    smtp_password = os.environ.get("SMTP_PASSWORD")
+
+    with smtplib.SMTP(smtp_host, smtp_port) as server:
+        if smtp_user and smtp_password:
+            server.starttls()
+            server.login(smtp_user, smtp_password)
+        server.send_message(msg)
+
 
 # =====
 # Core data helpers
@@ -509,13 +612,83 @@ def index():
                 "message": "The email used in the application does not match the verified email."
             }), 400
 
-        app_id = save_application(request.form.to_dict())
+# user message
+        app_data = request.form.to_dict()
+        app_id = save_application(app_data)
+
+        # 1. Load matching opportunity info
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT *
+                    FROM opportunities
+                    WHERE LOWER(TRIM(title)) = LOWER(TRIM(%s))
+                    LIMIT 1
+                """, (app_data.get("title"),))
+                opportunity = cur.fetchone()
+
+        if opportunity:
+            opportunity = dict(opportunity)
+
+        # 2. Send email to volunteer
+        send_volunteer_confirmation_email(app_data, opportunity)
+
+        # 3. Notify champion(s), if any
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT a.first_name, a.last_name, a.email
+                    FROM champions_opportunities co
+                    JOIN applications a ON co.champion_id = a.id
+                    JOIN opportunities o ON o.id = co.opportunity_id
+                    WHERE LOWER(TRIM(o.title)) = LOWER(TRIM(%s))
+                """, (app_data.get("title"),))
+                champs = cur.fetchall()
+
+                for c in champs:
+                    send_champion_notification_email(
+                        app_data,
+                        {"first_name": c["first_name"], "last_name": c["last_name"], "email": c["email"]},
+                        opportunity
+                    )
+
+        # 3. Notify champion(s), if any
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT a.first_name, a.last_name, a.email
+                    FROM champions_opportunities co
+                    JOIN applications a ON co.champion_id = a.id
+                    JOIN opportunities o ON o.id = co.opportunity_id
+                    WHERE LOWER(TRIM(o.title)) = LOWER(TRIM(%s))
+                """, (app_data.get("title"),))
+                champs = cur.fetchall()
+
+                # Safety: ensure opportunity dict exists
+                if opportunity is None:
+                    opportunity = {"title": app_data.get("title", "")}
+
+                # Notify each champion
+                for c in champs:
+                    send_champion_notification_email(
+                        app_data,
+                        {
+                            "first_name": c["first_name"],
+                            "last_name": c["last_name"],
+                            "email": c["email"]
+                        },
+                        opportunity
+                    )
+
+            
+
         return jsonify({
             "status": "success",
             "title": request.form.get("title"),
             "message": "Thank you. Your volunteer application has been submitted.",
             "application_id": app_id
         })
+                
 
     verified_email = (session.get("verified_email") or "").strip().lower()
 
