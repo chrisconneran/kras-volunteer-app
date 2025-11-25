@@ -612,6 +612,7 @@ def index():
 # =====
 @app.route("/menu")
 def menu():
+    session.permanent = True
     return render_template("Menu.html")
 
 
@@ -620,6 +621,7 @@ def menu():
 # =====
 @app.route("/manage", methods=["GET"])
 def manage():
+    session.permanent = True
     auth = require_admin()
     if auth:
         return auth
@@ -1025,6 +1027,7 @@ def reopen_opportunity(opp_id):
 # =====
 @app.route("/closed")
 def closed_opportunities():
+    session.permanent = True
     auth = require_admin()
     if auth:
         return auth
@@ -1327,6 +1330,7 @@ def check_volunteer():
 # =====
 @app.route("/review")
 def review():
+    session.permanent = True
     auth = require_admin()
     if auth:
         return auth
@@ -1362,6 +1366,7 @@ def review():
 
 @app.route("/update_status/<int:app_id>", methods=["POST"])
 def update_status(app_id):
+    session.permanent = True
     """
     Update the status of an application.
 
@@ -1454,6 +1459,7 @@ def update_status(app_id):
 
 @app.route("/delete_application/<int:app_id>", methods=["POST"])
 def delete_application(app_id):
+    session.permanent = True
     auth = require_admin()
     if auth:
         return auth
@@ -1470,6 +1476,7 @@ def delete_application(app_id):
 # =====
 @app.route("/volunteers")
 def volunteers():
+    session.permanent = True
     auth = require_admin()
     if auth:
         return auth
@@ -1508,6 +1515,7 @@ def volunteers():
 # =====
 @app.route("/volunteer/<int:app_id>")
 def volunteer_detail(app_id):
+    session.permanent = True
     """
     Volunteer detail and assignment screen.
 
@@ -1763,6 +1771,7 @@ def view_applications(opp_id):
 # =====
 @app.route("/add_note/<int:app_id>", methods=["POST"])
 def add_note(app_id):
+    session.permanent = True
     """
     Add an admin or champion note to an application.
 
