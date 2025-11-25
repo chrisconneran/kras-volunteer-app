@@ -1770,9 +1770,11 @@ def view_applications(opp_id):
 
     # Back button routing: Admins → manage, Champions → index
     session.permanent = True  # <-- REQUIRED FIX
-    back_to_menu_url = (
-        url_for("manage") if session.get("admin_verified") else url_for("index", verified=1)
-    )
+    if session.get("admin_verified"):
+        back_to_menu_url = url_for("menu", admin_verified=1)
+    else:
+        back_to_menu_url = url_for("index", verified=1)
+
 
 
 
