@@ -613,6 +613,7 @@ def index():
 @app.route("/menu")
 def menu():
     session.permanent = True
+    session.modified = True         
     return render_template("Menu.html")
 
 
