@@ -386,77 +386,61 @@ If you did not request this, you can ignore this message.
 
 def send_volunteer_confirmation_email(app_data, opportunity):
     """
-    Sends a polished, professional confirmation email to the volunteer.
+    Sends a confirmation email to the volunteer after they submit an application.
     """
     recipient = app_data["email"]
-    subject = f"Thank you for applying to volunteer for: {opportunity.get('title', app_data['title'])}"
+    subject = f"Thank you for applying to: {app_data['title']}"
 
     logo_url = url_for("static", filename="kras_logo.png", _external=True)
 
-    # Build a nonprofit-style modern HTML email
     html_body = f"""
     <html>
-      <body style="margin:0; padding:0; background:#f5f6fa; font-family:Arial, sans-serif; color:#333;">
+    <body style="font-family: Arial, sans-serif; color:#333;">
 
-        <!-- HEADER -->
-        <div style="background:#ffffff; padding:20px; text-align:left; border-bottom:1px solid #e5e7eb;">
-          <img src="{logo_url}" alt="KRAS Kickers" style="height:60px;">
+        <!-- Logo aligned left -->
+        <div style="text-align:left; margin-bottom:20px;">
+        <img src="{logo_url}" alt="KRAS Kickers" style="height:65px;">
         </div>
 
-        <!-- EMAIL BODY WRAPPER -->
-        <div style="max-width:700px; margin:30px auto; background:#ffffff; padding:30px; 
-                    border-radius:10px; box-shadow:0 2px 6px rgba(0,0,0,0.05);">
+        <!-- Title -->
+        <h2 style="color:#2563eb;">
+        Thank you for applying to volunteer for: {opportunity.get("title", app_data["title"])}
+        </h2>
 
-          <!-- Main Title -->
-          <h2 style="color:#2563eb; margin-top:0;">
-            Thank you for applying to volunteer for: {opportunity.get("title", app_data["title"])}
-          </h2>
+        <p>Dear {app_data['first_name']} {app_data['last_name']},</p>
 
-          <p style="font-size:15px;">
-            Dear {app_data['first_name']} {app_data['last_name']},
-          </p>
+        <p>
+        We have received your volunteer application for the opportunity listed below.
+        A KRAS Kickers coordinator or champion will contact you within 
+        <strong>48 hours</strong>.
+        </p>
 
-          <p style="font-size:15px; line-height:1.6;">
-            Thank you for your interest in volunteering with KRAS Kickers.
-            We have received your application for the opportunity below.
-            A KRAS Kickers coordinator or champion will contact you within 
-            <strong>48 hours</strong>.
-          </p>
+        <!-- Opportunity Details Box -->
+        <div style="border:1px solid #ddd; padding:15px; border-radius:8px; margin-top:20px;">
 
-          <!-- OPPORTUNITY SUMMARY CARD -->
-          <div style="
-              background:#f9fafb; 
-              padding:20px; 
-              border-radius:8px; 
-              border:1px solid #e5e7eb;
-              margin-top:25px;
-            ">
-            <h3 style="margin-top:0; margin-bottom:10px; color:#111;">
-              {opportunity.get("title", app_data["title"])}
-            </h3>
+        <!-- Opportunity Image -->
+        {f'<img src="data:image/png;base64,{opportunity.get("image_base64","")}" style="width:200px;border-radius:6px;margin-bottom:15px;">' if opportunity.get("image_base64") else ''}
 
-            <p style="margin:4px 0;"><strong>Time Commitment:</strong> {opportunity.get("time","")}</p>
-            <p style="margin:4px 0;"><strong>Duration:</strong> {opportunity.get("duration","")}</p>
-            <p style="margin:4px 0;"><strong>Frequency:</strong> {opportunity.get("mode","")}</p>
-            <p style="margin:4px 0;"><strong>Location:</strong> {opportunity.get("location","")}</p>
-            <p style="margin:4px 0;"><strong>Requirements:</strong> {opportunity.get("requirements","")}</p>
-            <p style="margin:4px 0;"><strong>Description:</strong> {opportunity.get("description","")}</p>
-          </div>
+        <h3 style="margin:0; color:#111;">{opportunity.get("title", app_data["title"])}</h3>
 
-          <!-- FOOTER -->
-          <p style="margin-top:30px; font-size:15px; line-height:1.6;">
-            Warm regards,<br>
-            <strong>KRAS Kickers Volunteer Team</strong>
-          </p>
+        <p><strong>Time Commitment:</strong> {opportunity.get("time","")}</p>
+        <p><strong>Duration:</strong> {opportunity.get("duration","")}</p>
+        <p><strong>Frequency:</strong> {opportunity.get("mode","")}</p>
+        <p><strong>Location:</strong> {opportunity.get("location","")}</p>
+        <p><strong>Requirements:</strong> {opportunity.get("requirements","")}</p>
+        <p><strong>Description:</strong> {opportunity.get("description","")}</p>
+
         </div>
 
-        <div style="text-align:center; padding:20px; color:#6b7280; font-size:12px;">
-          © {datetime.now().year} KRAS Kickers. All rights reserved.
-        </div>
+        <p style="margin-top:25px;">
+        Warm regards,<br>
+        KRAS Kickers Volunteer Team
+        </p>
 
-      </body>
+    </body>
     </html>
     """
+
 
     msg = EmailMessage()
     msg["Subject"] = subject
@@ -474,7 +458,6 @@ def send_volunteer_confirmation_email(app_data, opportunity):
             server.starttls()
             server.login(smtp_user, smtp_password)
         server.send_message(msg)
-
 
 # champion notification email
 def send_champion_notification_email(app_data, champion, opportunity):
@@ -671,33 +654,57 @@ def index():
         if opportunity:
             opportunity = dict(opportunity)
 
-        # --- send emails in background thread so UI responds instantly ---
-        import threading
+        # 2. Send email to volunteer
+        send_volunteer_confirmation_email(app_data, opportunity)
 
-        def send_all_emails():
-            # 1. volunteer email
-            send_volunteer_confirmation_email(app_data, opportunity)
+        # 3. Notify champion(s), if any
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT a.first_name, a.last_name, a.email
+                    FROM champions_opportunities co
+                    JOIN applications a ON co.champion_id = a.id
+                    JOIN opportunities o ON o.id = co.opportunity_id
+                    WHERE LOWER(TRIM(o.title)) = LOWER(TRIM(%s))
+                """, (app_data.get("title"),))
+                champs = cur.fetchall()
 
-            # 2. champion emails
-            with get_db_connection() as conn:
-                with conn.cursor() as cur:
-                    cur.execute("""
-                        SELECT a.first_name, a.last_name, a.email
-                        FROM champions_opportunities co
-                        JOIN applications a ON co.champion_id = a.id
-                        JOIN opportunities o ON o.id = co.opportunity_id
-                        WHERE LOWER(TRIM(o.title)) = LOWER(TRIM(%s))
-                    """, (app_data.get("title"),))
-                    champs = cur.fetchall()
+                for c in champs:
+                    send_champion_notification_email(
+                        app_data,
+                        {"first_name": c["first_name"], "last_name": c["last_name"], "email": c["email"]},
+                        opportunity
+                    )
 
-                    for c in champs:
-                        send_champion_notification_email(
-                            app_data,
-                            {"first_name": c["first_name"], "last_name": c["last_name"], "email": c["email"]},
-                            opportunity
-                        )
+        # 3. Notify champion(s), if any
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT a.first_name, a.last_name, a.email
+                    FROM champions_opportunities co
+                    JOIN applications a ON co.champion_id = a.id
+                    JOIN opportunities o ON o.id = co.opportunity_id
+                    WHERE LOWER(TRIM(o.title)) = LOWER(TRIM(%s))
+                """, (app_data.get("title"),))
+                champs = cur.fetchall()
 
-        threading.Thread(target=send_all_emails, daemon=True).start()
+                # Safety: ensure opportunity dict exists
+                if opportunity is None:
+                    opportunity = {"title": app_data.get("title", "")}
+
+                # Notify each champion
+                for c in champs:
+                    send_champion_notification_email(
+                        app_data,
+                        {
+                            "first_name": c["first_name"],
+                            "last_name": c["last_name"],
+                            "email": c["email"]
+                        },
+                        opportunity
+                    )
+
+            
 
         return jsonify({
             "status": "success",
