@@ -479,7 +479,11 @@ def admin_activate(token):
         return "Invalid or expired admin activation link.", 400
 
     session["admin_verified"] = True
+    session["email_verified"] = True        # <--- REQUIRED
+    session["verified_email"] = email       # <--- REQUIRED
     session.permanent = True
+    session.modified = True
+
 
     return redirect(url_for("menu", admin_verified=1))
 
@@ -612,8 +616,11 @@ def index():
 # =====
 @app.route("/menu")
 def menu():
-    session.permanent = True
-    session.modified = True         
+    if session.get("admin_verified"):
+        # Ensure admin stays authenticated
+        session["email_verified"] = True
+        session.modified = True
+        session.permanent = True
     return render_template("Menu.html")
 
 
