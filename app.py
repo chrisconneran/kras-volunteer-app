@@ -395,28 +395,52 @@ def send_volunteer_confirmation_email(app_data, opportunity):
 
     html_body = f"""
     <html>
-      <body style="font-family: Arial, sans-serif; color:#333;">
-        <div style="text-align:center; margin-bottom:20px;">
-          <img src="{logo_url}" alt="KRAS Kickers" style="height:65px;">
+    <body style="font-family: Arial, sans-serif; color:#333;">
+
+        <!-- Logo aligned left -->
+        <div style="text-align:left; margin-bottom:20px;">
+        <img src="{logo_url}" alt="KRAS Kickers" style="height:65px;">
         </div>
 
-        <h2 style="color:#2563eb;">Thank you for applying to volunteer!</h2>
+        <!-- Title -->
+        <h2 style="color:#2563eb;">
+        Thank you for applying to volunteer for: {opportunity.get("title", app_data["title"])}
+        </h2>
 
         <p>Dear {app_data['first_name']} {app_data['last_name']},</p>
 
-        <p>We have received your volunteer application for the opportunity:</p>
-
-        <p style="font-size:1.1rem; font-weight:bold;">{app_data['title']}</p>
-
         <p>
-          A KRAS Kickers coordinator or champion will reach out to you
-          within <strong>48 hours</strong> via your preferred contact method.
+        We have received your volunteer application for the opportunity listed below.
+        A KRAS Kickers coordinator or champion will contact you within 
+        <strong>48 hours</strong>.
         </p>
 
-        <p style="margin-top:25px;">Warm regards,<br>KRAS Kickers Volunteer Team</p>
-      </body>
+        <!-- Opportunity Details Box -->
+        <div style="border:1px solid #ddd; padding:15px; border-radius:8px; margin-top:20px;">
+
+        <!-- Opportunity Image -->
+        {f'<img src="data:image/png;base64,{opportunity.get("image_base64","")}" style="width:200px;border-radius:6px;margin-bottom:15px;">' if opportunity.get("image_base64") else ''}
+
+        <h3 style="margin:0; color:#111;">{opportunity.get("title", app_data["title"])}</h3>
+
+        <p><strong>Time Commitment:</strong> {opportunity.get("time","")}</p>
+        <p><strong>Duration:</strong> {opportunity.get("duration","")}</p>
+        <p><strong>Frequency:</strong> {opportunity.get("mode","")}</p>
+        <p><strong>Location:</strong> {opportunity.get("location","")}</p>
+        <p><strong>Requirements:</strong> {opportunity.get("requirements","")}</p>
+        <p><strong>Description:</strong> {opportunity.get("description","")}</p>
+
+        </div>
+
+        <p style="margin-top:25px;">
+        Warm regards,<br>
+        KRAS Kickers Volunteer Team
+        </p>
+
+    </body>
     </html>
     """
+
 
     msg = EmailMessage()
     msg["Subject"] = subject
