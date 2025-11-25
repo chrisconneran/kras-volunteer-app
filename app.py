@@ -699,36 +699,6 @@ def index():
 
         threading.Thread(target=send_all_emails, daemon=True).start()
 
-        # 3. Notify champion(s), if any
-        with get_db_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    SELECT a.first_name, a.last_name, a.email
-                    FROM champions_opportunities co
-                    JOIN applications a ON co.champion_id = a.id
-                    JOIN opportunities o ON o.id = co.opportunity_id
-                    WHERE LOWER(TRIM(o.title)) = LOWER(TRIM(%s))
-                """, (app_data.get("title"),))
-                champs = cur.fetchall()
-
-                # Safety: ensure opportunity dict exists
-                if opportunity is None:
-                    opportunity = {"title": app_data.get("title", "")}
-
-                # Notify each champion
-                for c in champs:
-                    send_champion_notification_email(
-                        app_data,
-                        {
-                            "first_name": c["first_name"],
-                            "last_name": c["last_name"],
-                            "email": c["email"]
-                        },
-                        opportunity
-                    )
-
-            
-
         return jsonify({
             "status": "success",
             "title": request.form.get("title"),
