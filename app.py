@@ -617,11 +617,16 @@ def index():
 @app.route("/menu")
 def menu():
     if session.get("admin_verified"):
-        # Ensure admin stays authenticated
+        # Fully restore admin session
         session["email_verified"] = True
-        session.modified = True
+        session["verified_email"] = session.get("verified_email", "admin@kraskickers.org")
+        session["admin_verified"] = True
+
         session.permanent = True
+        session.modified = True
+
     return render_template("Menu.html")
+
 
 
 # =====
