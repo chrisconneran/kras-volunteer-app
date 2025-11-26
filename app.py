@@ -419,7 +419,7 @@ def send_volunteer_confirmation_email(app_data, opportunity):
         <div style="border:1px solid #ddd; padding:15px; border-radius:8px; margin-top:20px;">
 
         <!-- Opportunity Image -->
-        
+        {f'<img src="data:image/png;base64,{opportunity.get("image_base64","")}" style="width:200px;border-radius:6px;margin-bottom:15px;">' if opportunity.get("image_base64") else ''}
 
         <h3 style="margin:0; color:#111;">{opportunity.get("title", app_data["title"])}</h3>
 
@@ -509,43 +509,6 @@ def send_champion_notification_email(app_data, champion, opportunity):
             server.login(smtp_user, smtp_password)
         server.send_message(msg)
 
-# ===== ASYNC BACKGROUND EMAIL THREAD =====
-import threading
-
-def async_send_emails(app_data, opportunity):
-    """
-    Background thread that sends volunteer + champion emails asynchronously
-    so the UI confirmation modal appears immediately.
-    """
-    try:
-        send_volunteer_confirmation_email(app_data, opportunity)
-    except Exception:
-        pass
-
-    # Notify champion(s)
-    try:
-        with get_db_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    SELECT a.first_name, a.last_name, a.email
-                    FROM champions_opportunities co
-                    JOIN applications a ON co.champion_id = a.id
-                    JOIN opportunities o ON o.id = co.opportunity_id
-                    WHERE LOWER(TRIM(o.title)) = LOWER(TRIM(%s))
-                """, (app_data.get("title"),))
-                champs = cur.fetchall()
-
-                for c in champs:
-                    try:
-                        send_champion_notification_email(
-                            app_data,
-                            {"first_name": c["first_name"], "last_name": c["last_name"], "email": c["email"]},
-                            opportunity
-                        )
-                    except Exception:
-                        pass
-    except Exception:
-        pass
 
 # =====
 # Core data helpers
@@ -691,19 +654,57 @@ def index():
         if opportunity:
             opportunity = dict(opportunity)
 
+        # 2. Send email to volunteer
+        send_volunteer_confirmation_email(app_data, opportunity)
 
+        # 3. Notify champion(s), if any
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT a.first_name, a.last_name, a.email
+                    FROM champions_opportunities co
+                    JOIN applications a ON co.champion_id = a.id
+                    JOIN opportunities o ON o.id = co.opportunity_id
+                    WHERE LOWER(TRIM(o.title)) = LOWER(TRIM(%s))
+                """, (app_data.get("title"),))
+                champs = cur.fetchall()
 
-        # fire-and-forget email thread
-        threading.Thread(
-            target=async_send_emails,
-            args=(app_data, opportunity),
-            daemon=True
-        ).start()
-        # ===== END ASYNC EMAIL SENDING =====
+                for c in champs:
+                    send_champion_notification_email(
+                        app_data,
+                        {"first_name": c["first_name"], "last_name": c["last_name"], "email": c["email"]},
+                        opportunity
+                    )
 
+        # 3. Notify champion(s), if any
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT a.first_name, a.last_name, a.email
+                    FROM champions_opportunities co
+                    JOIN applications a ON co.champion_id = a.id
+                    JOIN opportunities o ON o.id = co.opportunity_id
+                    WHERE LOWER(TRIM(o.title)) = LOWER(TRIM(%s))
+                """, (app_data.get("title"),))
+                champs = cur.fetchall()
 
- # Champion notifications are now sent inside async_send_emails()
-           
+                # Safety: ensure opportunity dict exists
+                if opportunity is None:
+                    opportunity = {"title": app_data.get("title", "")}
+
+                # Notify each champion
+                for c in champs:
+                    send_champion_notification_email(
+                        app_data,
+                        {
+                            "first_name": c["first_name"],
+                            "last_name": c["last_name"],
+                            "email": c["email"]
+                        },
+                        opportunity
+                    )
+
+            
 
         return jsonify({
             "status": "success",
@@ -1188,27 +1189,26 @@ def api_get_opportunity(opp_id):
                 return jsonify({"error": "Opportunity not found"}), 404
 
             # Parse tags if stored as JSON string
-            tags_raw = row.get("tags")
             tags = []
-            if tags_raw:
+            if row[8]:
                 try:
-                    parsed = json.loads(tags_raw)
+                    parsed = json.loads(row[8])
                     if isinstance(parsed, list):
                         tags = parsed
                 except Exception:
                     tags = []
 
             return jsonify({
-                "id": row.get("id"),
-                "title": row.get("title"),
-                "time": row.get("time"),
-                "duration": row.get("duration"),
-                "mode": row.get("mode"),
-                "location": row.get("location"),
-                "requirements": row.get("requirements"),
-                "desc": row.get("desc"),
+                "id": row[0],
+                "title": row[1],
+                "time": row[2],
+                "duration": row[3],
+                "mode": row[4],
+                "location": row[5],
+                "requirements": row[6],
+                "desc": row[7],
                 "tags": tags,
-                "image_base64": row.get("image_base64")
+                "image_base64": row[9]
             })
 
 
@@ -1848,7 +1848,12 @@ def api_get_applicant(app_id):
     if not row:
         return jsonify({"error": "Applicant not found"}), 404
 
-    data = dict(row)
+    cols = [
+        "id", "first_name", "last_name", "email", "phone", "contact",
+        "title", "time", "duration", "mode", "location",
+        "comments", "status", "timestamp", "history", "notes"
+    ]
+    data = dict(zip(cols, row))
 
     return jsonify(data)
 
