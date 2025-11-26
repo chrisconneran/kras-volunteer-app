@@ -34,6 +34,10 @@ def run_async(func, *args):
 app = Flask(__name__, static_folder="static", static_url_path="/static")
 app.secret_key = "supersecretkey"
 
+# Fix: Enable url_for(...) inside background threads
+app.config["SERVER_NAME"] = "kras-volunteer-app.onrender.com"
+
+
 # Required so admin session survives on Render
 app.config["SESSION_COOKIE_SAMESITE"] = "None"
 app.config["SESSION_COOKIE_SECURE"] = True
