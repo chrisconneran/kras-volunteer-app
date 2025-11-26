@@ -4,6 +4,9 @@ import os
 import json
 import smtplib
 from email.message import EmailMessage
+from dotenv import load_dotenv
+load_dotenv()
+
 
 import psycopg
 from psycopg.rows import dict_row
