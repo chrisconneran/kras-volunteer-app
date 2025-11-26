@@ -419,7 +419,7 @@ def send_volunteer_confirmation_email(app_data, opportunity):
         <div style="border:1px solid #ddd; padding:15px; border-radius:8px; margin-top:20px;">
 
         <!-- Opportunity Image -->
-        ''''
+        
 
         <h3 style="margin:0; color:#111;">{opportunity.get("title", app_data["title"])}</h3>
 
