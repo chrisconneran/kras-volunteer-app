@@ -12,7 +12,13 @@ from werkzeug.utils import secure_filename
 
 import base64
 
+import threading
 
+def run_async(func, *args):
+    thread = threading.Thread(target=func, args=args)
+    thread.daemon = True
+    thread.start()
+    
 
 # =====
 # Flask app setup
@@ -419,7 +425,7 @@ def send_volunteer_confirmation_email(app_data, opportunity):
         <div style="border:1px solid #ddd; padding:15px; border-radius:8px; margin-top:20px;">
 
         <!-- Opportunity Image -->
-        {f'<img src="data:image/png;base64,{opportunity.get("image_base64","")}" style="width:200px;border-radius:6px;margin-bottom:15px;">' if opportunity.get("image_base64") else ''}
+     
 
         <h3 style="margin:0; color:#111;">{opportunity.get("title", app_data["title"])}</h3>
 
@@ -651,58 +657,46 @@ def index():
                 """, (app_data.get("title"),))
                 opportunity = cur.fetchone()
 
-        if opportunity:
-            opportunity = dict(opportunity)
+                if opportunity:
+                    opportunity = dict(opportunity)
+                else:
+                    # Safe fallback so email formatting still works
+                    opportunity = {
+                        "title": app_data.get("title", ""),
+                        "time": app_data.get("time", ""),
+                        "duration": app_data.get("duration", ""),
+                        "mode": app_data.get("mode", ""),
+                        "location": app_data.get("location", ""),
+                        "requirements": "",
+                        "description": app_data.get("comments", ""),
+                    }
 
-        # 2. Send email to volunteer
-        send_volunteer_confirmation_email(app_data, opportunity)
+                     # 2. SEND EMAILS ASYNC (non-blocking)
+                    run_async(send_volunteer_confirmation_email, app_data, opportunity)
 
-        # 3. Notify champion(s), if any
-        with get_db_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    SELECT a.first_name, a.last_name, a.email
-                    FROM champions_opportunities co
-                    JOIN applications a ON co.champion_id = a.id
-                    JOIN opportunities o ON o.id = co.opportunity_id
-                    WHERE LOWER(TRIM(o.title)) = LOWER(TRIM(%s))
-                """, (app_data.get("title"),))
-                champs = cur.fetchall()
+                    # 3. Notify champion(s), if any — also async
+                    with get_db_connection() as conn:
+                        with conn.cursor() as cur:
+                            cur.execute("""
+                                SELECT a.first_name, a.last_name, a.email
+                                FROM champions_opportunities co
+                                JOIN applications a ON co.champion_id = a.id
+                                JOIN opportunities o ON o.id = co.opportunity_id
+                                WHERE LOWER(TRIM(o.title)) = LOWER(TRIM(%s))
+                            """, (app_data.get("title"),))
+                            champs = cur.fetchall()
 
-                for c in champs:
-                    send_champion_notification_email(
-                        app_data,
-                        {"first_name": c["first_name"], "last_name": c["last_name"], "email": c["email"]},
-                        opportunity
-                    )
-
-        # 3. Notify champion(s), if any
-        with get_db_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    SELECT a.first_name, a.last_name, a.email
-                    FROM champions_opportunities co
-                    JOIN applications a ON co.champion_id = a.id
-                    JOIN opportunities o ON o.id = co.opportunity_id
-                    WHERE LOWER(TRIM(o.title)) = LOWER(TRIM(%s))
-                """, (app_data.get("title"),))
-                champs = cur.fetchall()
-
-                # Safety: ensure opportunity dict exists
-                if opportunity is None:
-                    opportunity = {"title": app_data.get("title", "")}
-
-                # Notify each champion
-                for c in champs:
-                    send_champion_notification_email(
-                        app_data,
-                        {
-                            "first_name": c["first_name"],
-                            "last_name": c["last_name"],
-                            "email": c["email"]
-                        },
-                        opportunity
-                    )
+                            for c in champs:
+                                run_async(
+                                    send_champion_notification_email,
+                                    app_data,
+                                    {
+                                        "first_name": c["first_name"],
+                                        "last_name": c["last_name"],
+                                        "email": c["email"],
+                                    },
+                                    opportunity,
+                                )
 
             
 
